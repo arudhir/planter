@@ -1,0 +1,35 @@
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 8
+Rules claiming more threads will be scaled down.
+Job stats:
+job      count
+-----  -------
+all          1
+fastp        2
+total        3
+
+Select jobs to execute...
+Execute 1 jobs...
+
+[Mon Jun 24 12:10:15 2024]
+localrule fastp:
+    input: outputs/illumina/SRR2103848_first5k_1.fastq.gz, outputs/illumina/SRR2103848_first5k_2.fastq.gz
+    output: outputs/illumina/fastp/SRR2103848_first5k_1.fq.gz, outputs/illumina/fastp/SRR2103848_first5k_2.fq.gz
+    jobid: 3
+    reason: Missing output files: outputs/illumina/fastp/SRR2103848_first5k_1.fq.gz, outputs/illumina/fastp/SRR2103848_first5k_2.fq.gz
+    wildcards: sample=SRR2103848_first5k
+    threads: 8
+    resources: tmpdir=/tmp
+
+[Mon Jun 24 12:10:16 2024]
+Error in rule fastp:
+    jobid: 3
+    input: outputs/illumina/SRR2103848_first5k_1.fastq.gz, outputs/illumina/SRR2103848_first5k_2.fastq.gz
+    output: outputs/illumina/fastp/SRR2103848_first5k_1.fq.gz, outputs/illumina/fastp/SRR2103848_first5k_2.fq.gz
+
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look above for error message
+Complete log: .snakemake/log/2024-06-24T121015.778642.snakemake.log
+WorkflowError:
+At least one job did not complete successfully.

@@ -1,0 +1,53 @@
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 8
+Rules claiming more threads will be scaled down.
+Job stats:
+job               count
+--------------  -------
+all                   1
+download_reads        1
+fastp                 2
+trimmomatic           2
+total                 6
+
+Select jobs to execute...
+Execute 1 jobs...
+
+[Mon Jun 24 18:02:43 2024]
+localrule fastp:
+    input: outputs/illumina/raw/SRR2103848_second5k_1.fastq.gz, outputs/illumina/raw/SRR2103848_second5k_2.fastq.gz
+    output: outputs/illumina/fastp/SRR2103848_second5k.1.fq.gz, outputs/illumina/fastp/SRR2103848_second5k.2.fq.gz, outputs/illumina/fastp/SRR2103848_second5k_fastp.json, outputs/illumina/fastp/SRR2103848_second5k_fastp.html
+    jobid: 4
+    reason: Missing output files: outputs/illumina/fastp/SRR2103848_second5k_fastp.json, outputs/illumina/fastp/SRR2103848_second5k.1.fq.gz, outputs/illumina/fastp/SRR2103848_second5k_fastp.html, outputs/illumina/fastp/SRR2103848_second5k.2.fq.gz
+    wildcards: sample=SRR2103848_second5k
+    threads: 8
+    resources: tmpdir=/tmp
+
+[Mon Jun 24 18:02:44 2024]
+Finished job 4.
+1 of 6 steps (17%) done
+Select jobs to execute...
+Execute 1 jobs...
+
+[Mon Jun 24 18:02:44 2024]
+localrule trimmomatic:
+    input: outputs/illumina/fastp/SRR2103848_second5k.1.fq.gz, outputs/illumina/fastp/SRR2103848_second5k.2.fq.gz
+    output: outputs/illumina/trimmed/SRR2103848_second5k_trimmed.1.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.1u.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.2.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.2u.fq.gz
+    jobid: 6
+    reason: Missing output files: outputs/illumina/trimmed/SRR2103848_second5k_trimmed.2.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.1u.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.1.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.2u.fq.gz; Input files updated by another job: outputs/illumina/fastp/SRR2103848_second5k.1.fq.gz, outputs/illumina/fastp/SRR2103848_second5k.2.fq.gz
+    wildcards: sample=SRR2103848_second5k
+    threads: 8
+    resources: tmpdir=/tmp
+
+[Mon Jun 24 18:02:45 2024]
+Error in rule trimmomatic:
+    jobid: 6
+    input: outputs/illumina/fastp/SRR2103848_second5k.1.fq.gz, outputs/illumina/fastp/SRR2103848_second5k.2.fq.gz
+    output: outputs/illumina/trimmed/SRR2103848_second5k_trimmed.1.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.1u.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.2.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.2u.fq.gz
+
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look above for error message
+Complete log: .snakemake/log/2024-06-24T180243.257981.snakemake.log
+WorkflowError:
+At least one job did not complete successfully.

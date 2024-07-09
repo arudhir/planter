@@ -1,0 +1,45 @@
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 8
+Rules claiming more threads will be scaled down.
+Job stats:
+job               count
+--------------  -------
+all                   1
+download_reads        2
+fastp_raw             2
+fastp_trimmed         2
+trimmomatic           2
+trinity               2
+total                11
+
+Select jobs to execute...
+Execute 2 jobs...
+
+[Sat Jul  6 22:42:23 2024]
+localrule download_reads:
+    output: outputs/illumina/raw/SRR2103848_second5k_1.fastq.gz, outputs/illumina/raw/SRR2103848_second5k_2.fastq.gz
+    jobid: 2
+    reason: Missing output files: outputs/illumina/raw/SRR2103848_second5k_2.fastq.gz, outputs/illumina/raw/SRR2103848_second5k_1.fastq.gz
+    wildcards: sample=SRR2103848_second5k
+    resources: tmpdir=/tmp
+
+
+[Sat Jul  6 22:42:23 2024]
+localrule download_reads:
+    output: outputs/illumina/raw/SRR2103848_first5k_1.fastq.gz, outputs/illumina/raw/SRR2103848_first5k_2.fastq.gz
+    jobid: 1
+    reason: Missing output files: outputs/illumina/raw/SRR2103848_first5k_1.fastq.gz, outputs/illumina/raw/SRR2103848_first5k_2.fastq.gz
+    wildcards: sample=SRR2103848_first5k
+    resources: tmpdir=/tmp
+
+Waiting at most 5 seconds for missing files.
+MissingOutputException in rule download_reads in file /home/ubuntu/transXpress2/workflow/rules/illumina.smk, line 3:
+Job 2  completed successfully, but some output files are missing. Missing files after 5 seconds. This might be due to filesystem latency. If that is the case, consider to increase the wait time with --latency-wait:
+outputs/illumina/raw/SRR2103848_second5k_1.fastq.gz (missing locally, parent dir contents: reads)
+outputs/illumina/raw/SRR2103848_second5k_2.fastq.gz (missing locally, parent dir contents: reads)
+Waiting at most 5 seconds for missing files.
+Terminating processes on user request, this might take some time.
+Complete log: .snakemake/log/2024-07-06T224222.994534.snakemake.log
+WorkflowError:
+At least one job did not complete successfully.

@@ -1,0 +1,19 @@
+
+configfile: "workflow/config.yaml"
+outdir = config['outdir']
+
+include: 'rules/illumina.smk'
+include: 'rules/trinity.smk'
+
+samples = [
+    'SRR2103848_first5k',
+    'SRR2103848_second5k',
+]
+
+rule all:
+    input:
+        expand(rules.download_reads.output, sample=samples),
+        expand(rules.fastp_raw.output, sample=samples),
+        expand(rules.trimmomatic.output, sample=samples),
+        expand(rules.fastp_trimmed.output, sample=samples),
+        expand(rules.trinity.output, sample=samples)

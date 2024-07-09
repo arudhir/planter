@@ -1,0 +1,11 @@
+{
+    "salmon_version": "1.10.2",
+    "index": "Trinity.tmp.fasta.salmon.idx",
+    "libType": "U",
+    "unmatedReads": "/home/ubuntu/transXpress2/outputs/trinity/SRR2103848_second5k_trinity/both.fa",
+    "output": "salmon_outdir",
+    "threads": "2",
+    "minAssignedFrags": "1",
+    "validateMappings": [],
+    "auxDir": "aux_info"
+}

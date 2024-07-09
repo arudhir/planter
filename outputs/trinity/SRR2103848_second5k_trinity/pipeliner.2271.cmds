@@ -1,0 +1,2 @@
+/opt/trinityrnaseq-v2.15.1/util/support_scripts/salmon_runner.pl Trinity.tmp.fasta /home/ubuntu/transXpress2/outputs/trinity/SRR2103848_second5k_trinity/both.fa 2
+/opt/trinityrnaseq-v2.15.1/util/support_scripts/filter_transcripts_require_min_cov.pl Trinity.tmp.fasta /home/ubuntu/transXpress2/outputs/trinity/SRR2103848_second5k_trinity/both.fa salmon_outdir/quant.sf 2 > /home/ubuntu/transXpress2/outputs/trinity/SRR2103848_second5k_trinity.Trinity.fasta

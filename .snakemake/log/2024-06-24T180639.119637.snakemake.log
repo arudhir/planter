@@ -1,0 +1,123 @@
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 8
+Rules claiming more threads will be scaled down.
+Job stats:
+job              count
+-------------  -------
+all                  1
+fastp_raw            2
+fastp_trimmed        2
+trimmomatic          2
+total                7
+
+Select jobs to execute...
+Execute 1 jobs...
+
+[Mon Jun 24 18:06:39 2024]
+localrule fastp_raw:
+    input: outputs/illumina/raw/SRR2103848_first5k_1.fastq.gz, outputs/illumina/raw/SRR2103848_first5k_2.fastq.gz
+    output: outputs/illumina/fastp_raw/SRR2103848_first5k.1.fq.gz, outputs/illumina/fastp_raw/SRR2103848_first5k.2.fq.gz, outputs/illumina/fastp_raw/SRR2103848_first5k_fastp.json, outputs/illumina/fastp_raw/SRR2103848_first5k_fastp.html
+    jobid: 3
+    reason: Missing output files: outputs/illumina/fastp_raw/SRR2103848_first5k_fastp.html, outputs/illumina/fastp_raw/SRR2103848_first5k.2.fq.gz, outputs/illumina/fastp_raw/SRR2103848_first5k.1.fq.gz, outputs/illumina/fastp_raw/SRR2103848_first5k_fastp.json
+    wildcards: sample=SRR2103848_first5k
+    threads: 8
+    resources: tmpdir=/tmp
+
+[Mon Jun 24 18:06:40 2024]
+Finished job 3.
+1 of 7 steps (14%) done
+Select jobs to execute...
+Execute 1 jobs...
+
+[Mon Jun 24 18:06:40 2024]
+localrule fastp_raw:
+    input: outputs/illumina/raw/SRR2103848_second5k_1.fastq.gz, outputs/illumina/raw/SRR2103848_second5k_2.fastq.gz
+    output: outputs/illumina/fastp_raw/SRR2103848_second5k.1.fq.gz, outputs/illumina/fastp_raw/SRR2103848_second5k.2.fq.gz, outputs/illumina/fastp_raw/SRR2103848_second5k_fastp.json, outputs/illumina/fastp_raw/SRR2103848_second5k_fastp.html
+    jobid: 4
+    reason: Missing output files: outputs/illumina/fastp_raw/SRR2103848_second5k_fastp.html, outputs/illumina/fastp_raw/SRR2103848_second5k_fastp.json, outputs/illumina/fastp_raw/SRR2103848_second5k.1.fq.gz, outputs/illumina/fastp_raw/SRR2103848_second5k.2.fq.gz
+    wildcards: sample=SRR2103848_second5k
+    threads: 8
+    resources: tmpdir=/tmp
+
+[Mon Jun 24 18:06:41 2024]
+Finished job 4.
+2 of 7 steps (29%) done
+Select jobs to execute...
+Execute 1 jobs...
+
+[Mon Jun 24 18:06:41 2024]
+localrule trimmomatic:
+    input: outputs/illumina/fastp_raw/SRR2103848_second5k.1.fq.gz, outputs/illumina/fastp_raw/SRR2103848_second5k.2.fq.gz
+    output: outputs/illumina/trimmed/SRR2103848_second5k_trimmed.1.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.1u.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.2.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.2u.fq.gz
+    jobid: 6
+    reason: Missing output files: outputs/illumina/trimmed/SRR2103848_second5k_trimmed.2u.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.2.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.1u.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.1.fq.gz; Input files updated by another job: outputs/illumina/fastp_raw/SRR2103848_second5k.1.fq.gz, outputs/illumina/fastp_raw/SRR2103848_second5k.2.fq.gz; Set of input files has changed since last execution
+    wildcards: sample=SRR2103848_second5k
+    threads: 8
+    resources: tmpdir=/tmp
+
+[Mon Jun 24 18:06:42 2024]
+Finished job 6.
+3 of 7 steps (43%) done
+Select jobs to execute...
+Execute 1 jobs...
+
+[Mon Jun 24 18:06:42 2024]
+localrule trimmomatic:
+    input: outputs/illumina/fastp_raw/SRR2103848_first5k.1.fq.gz, outputs/illumina/fastp_raw/SRR2103848_first5k.2.fq.gz
+    output: outputs/illumina/trimmed/SRR2103848_first5k_trimmed.1.fq.gz, outputs/illumina/trimmed/SRR2103848_first5k_trimmed.1u.fq.gz, outputs/illumina/trimmed/SRR2103848_first5k_trimmed.2.fq.gz, outputs/illumina/trimmed/SRR2103848_first5k_trimmed.2u.fq.gz
+    jobid: 5
+    reason: Missing output files: outputs/illumina/trimmed/SRR2103848_first5k_trimmed.1.fq.gz, outputs/illumina/trimmed/SRR2103848_first5k_trimmed.1u.fq.gz, outputs/illumina/trimmed/SRR2103848_first5k_trimmed.2u.fq.gz, outputs/illumina/trimmed/SRR2103848_first5k_trimmed.2.fq.gz; Input files updated by another job: outputs/illumina/fastp_raw/SRR2103848_first5k.2.fq.gz, outputs/illumina/fastp_raw/SRR2103848_first5k.1.fq.gz; Set of input files has changed since last execution
+    wildcards: sample=SRR2103848_first5k
+    threads: 8
+    resources: tmpdir=/tmp
+
+[Mon Jun 24 18:06:43 2024]
+Finished job 5.
+4 of 7 steps (57%) done
+Select jobs to execute...
+Execute 1 jobs...
+
+[Mon Jun 24 18:06:43 2024]
+localrule fastp_trimmed:
+    input: outputs/illumina/trimmed/SRR2103848_second5k_trimmed.1.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.2.fq.gz
+    output: outputs/illumina/fastp_trimmed/SRR2103848_second5k.1.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_second5k.2.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_second5k_fastp.json, outputs/illumina/fastp_trimmed/SRR2103848_second5k_fastp.html
+    jobid: 8
+    reason: Missing output files: outputs/illumina/fastp_trimmed/SRR2103848_second5k.2.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_second5k_fastp.html, outputs/illumina/fastp_trimmed/SRR2103848_second5k.1.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_second5k_fastp.json; Input files updated by another job: outputs/illumina/trimmed/SRR2103848_second5k_trimmed.2.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.1.fq.gz
+    wildcards: sample=SRR2103848_second5k
+    threads: 8
+    resources: tmpdir=/tmp
+
+[Mon Jun 24 18:06:45 2024]
+Finished job 8.
+5 of 7 steps (71%) done
+Select jobs to execute...
+Execute 1 jobs...
+
+[Mon Jun 24 18:06:45 2024]
+localrule fastp_trimmed:
+    input: outputs/illumina/trimmed/SRR2103848_first5k_trimmed.1.fq.gz, outputs/illumina/trimmed/SRR2103848_first5k_trimmed.2.fq.gz
+    output: outputs/illumina/fastp_trimmed/SRR2103848_first5k.1.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_first5k.2.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_first5k_fastp.json, outputs/illumina/fastp_trimmed/SRR2103848_first5k_fastp.html
+    jobid: 7
+    reason: Missing output files: outputs/illumina/fastp_trimmed/SRR2103848_first5k.2.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_first5k_fastp.json, outputs/illumina/fastp_trimmed/SRR2103848_first5k.1.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_first5k_fastp.html; Input files updated by another job: outputs/illumina/trimmed/SRR2103848_first5k_trimmed.1.fq.gz, outputs/illumina/trimmed/SRR2103848_first5k_trimmed.2.fq.gz
+    wildcards: sample=SRR2103848_first5k
+    threads: 8
+    resources: tmpdir=/tmp
+
+[Mon Jun 24 18:06:46 2024]
+Finished job 7.
+6 of 7 steps (86%) done
+Select jobs to execute...
+Execute 1 jobs...
+
+[Mon Jun 24 18:06:46 2024]
+localrule all:
+    input: outputs/illumina/raw/SRR2103848_first5k_1.fastq.gz, outputs/illumina/raw/SRR2103848_second5k_1.fastq.gz, outputs/illumina/raw/SRR2103848_first5k_2.fastq.gz, outputs/illumina/raw/SRR2103848_second5k_2.fastq.gz, outputs/illumina/fastp_raw/SRR2103848_first5k.1.fq.gz, outputs/illumina/fastp_raw/SRR2103848_second5k.1.fq.gz, outputs/illumina/fastp_raw/SRR2103848_first5k.2.fq.gz, outputs/illumina/fastp_raw/SRR2103848_second5k.2.fq.gz, outputs/illumina/fastp_raw/SRR2103848_first5k_fastp.json, outputs/illumina/fastp_raw/SRR2103848_second5k_fastp.json, outputs/illumina/fastp_raw/SRR2103848_first5k_fastp.html, outputs/illumina/fastp_raw/SRR2103848_second5k_fastp.html, outputs/illumina/trimmed/SRR2103848_first5k_trimmed.1.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.1.fq.gz, outputs/illumina/trimmed/SRR2103848_first5k_trimmed.1u.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.1u.fq.gz, outputs/illumina/trimmed/SRR2103848_first5k_trimmed.2.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.2.fq.gz, outputs/illumina/trimmed/SRR2103848_first5k_trimmed.2u.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.2u.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_first5k.1.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_second5k.1.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_first5k.2.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_second5k.2.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_first5k_fastp.json, outputs/illumina/fastp_trimmed/SRR2103848_second5k_fastp.json, outputs/illumina/fastp_trimmed/SRR2103848_first5k_fastp.html, outputs/illumina/fastp_trimmed/SRR2103848_second5k_fastp.html
+    jobid: 0
+    reason: Input files updated by another job: outputs/illumina/fastp_raw/SRR2103848_second5k_fastp.html, outputs/illumina/fastp_raw/SRR2103848_second5k_fastp.json, outputs/illumina/fastp_trimmed/SRR2103848_first5k_fastp.json, outputs/illumina/fastp_trimmed/SRR2103848_second5k.2.fq.gz, outputs/illumina/fastp_raw/SRR2103848_first5k_fastp.html, outputs/illumina/fastp_raw/SRR2103848_first5k_fastp.json, outputs/illumina/fastp_trimmed/SRR2103848_first5k.2.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_second5k.1.fq.gz, outputs/illumina/trimmed/SRR2103848_first5k_trimmed.2u.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_second5k_fastp.html, outputs/illumina/fastp_raw/SRR2103848_first5k.1.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.1u.fq.gz, outputs/illumina/fastp_raw/SRR2103848_second5k.1.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.2.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.2u.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.1.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_first5k.1.fq.gz, outputs/illumina/fastp_raw/SRR2103848_second5k.2.fq.gz, outputs/illumina/trimmed/SRR2103848_first5k_trimmed.1.fq.gz, outputs/illumina/trimmed/SRR2103848_first5k_trimmed.2.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_first5k_fastp.html, outputs/illumina/trimmed/SRR2103848_first5k_trimmed.1u.fq.gz, outputs/illumina/fastp_raw/SRR2103848_first5k.2.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_second5k_fastp.json
+    resources: tmpdir=/tmp
+
+[Mon Jun 24 18:06:46 2024]
+Finished job 0.
+7 of 7 steps (100%) done
+Complete log: .snakemake/log/2024-06-24T180639.119637.snakemake.log

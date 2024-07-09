@@ -1,0 +1,21 @@
+Statistics:
+===========
+Trinity Version:      Trinity-v2.15.1
+Compiler:             GCC
+Trinity Parameters:   --seqType fq --max_memory 50G --output sample_trinity --left ../outputs/illumina/trimmed/SRR2103848_first5k_trimmed.1.fq.gz --right ../outputs/illumina/trimmed/SRR2103848_first5k_trimmed.2.fq.gz
+Paired mode
+ Input data
+  Left.fasta    1 MByte
+  Right.fasta   1 MByte
+  Number of unique KMERs: 508321
+  Number of reads:        9666 Output data
+  Trinity.fasta 0 MByte
+
+Runtime
+=======
+Start:       Mon Jun 24 19:25:44 UTC 2024
+End:         Mon Jun 24 19:27:21 UTC 2024
+Trinity   97 seconds
+  Inchworm (phase 1 - read clustering)  2 seconds
+  Chrysalis (phase 1 - read clustering) 93 seconds
+  Rest (phase 2 - parallel assembly)       2 seconds
