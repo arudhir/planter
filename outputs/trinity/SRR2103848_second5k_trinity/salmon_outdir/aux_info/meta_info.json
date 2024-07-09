@@ -30,10 +30,10 @@
         403,
         961
     ],
-    "index_seq_hash": "fe5df95cfc67e6d0269b2b5d1af4328cb47c6b313bd832199fc8e0b4729028f4",
-    "index_name_hash": "0d2334f9d0068c516181ec7fd652575a3c91b2618aa94c8d4dc194a2e3ee29ab",
-    "index_seq_hash512": "e62e1d220439749908ea858076cf621a89fa6bc5bf14265b41a40c2f84584f573367b623c6905be58fe0e9f7d28ecde4840196da7cf587f138e022fccc8e3df6",
-    "index_name_hash512": "b267d33d6deaef4a5bac5a5f3b58d350fd2d99099e4d4d629b96d525fb09db8dbcb178f337f3eedd7a1500bfc3a6b7a13cb19b54d7781c1cd492a2184b66ae25",
+    "index_seq_hash": "23f3e26f59d81a23f5d82d9576c546341004042c888f9ebb74469a0046623f34",
+    "index_name_hash": "b8c7aa233d65ed8b2efb9f0fea66046dab1b55bc34ccf055d9885791bdccdd95",
+    "index_seq_hash512": "1045f550a9aeb9ad0f217ce3fdecade823f4bf704dd7eef3fe25a3e4b590bc0a506a00a7eb58354fa7aff8c49192b5f3188e1e5b05e56a1571a6b36c87664db6",
+    "index_name_hash512": "211a73b26479c10d335c697265404239f2185e9d32db71eed5009a7f3aaba7c724c2f6cd7d220a8742ca2cff2a10727d2b69c0b27461770c0058c5cca9fa313b",
     "index_decoy_seq_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "index_decoy_name_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "num_bootstraps": 0,
@@ -45,6 +45,6 @@
     "num_alignments_below_threshold_for_mapped_fragments_vm": 70,
     "percent_mapped": 22.953517071164133,
     "call": "quant",
-    "start_time": "Sat Jul 06 22:47:45 2024",
-    "end_time": "Sat Jul 06 22:47:45 2024"
+    "start_time": "Tue Jul 09 13:13:04 2024",
+    "end_time": "Tue Jul 09 13:13:05 2024"
 }

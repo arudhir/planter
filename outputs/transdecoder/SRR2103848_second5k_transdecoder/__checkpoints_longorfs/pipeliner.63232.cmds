@@ -1,0 +1,1 @@
+/opt/TransDecoder-TransDecoder-v5.7.0/util/compute_base_probs.pl outputs/trinity/SRR2103848_second5k_trinity/Trinity.tmp.fasta 0 > outputs/transdecoder/SRR2103848_second5k_transdecoder/base_freqs.dat

@@ -7,7 +7,7 @@
 504 -> 527 weldmers: 0 scaff_pairs: 3 total: 3 min_len: 170
 508 -> 237 weldmers: 0 scaff_pairs: 2 total: 2 min_len: 107
 527 -> 504 weldmers: 0 scaff_pairs: 3 total: 3 min_len: 170
-542 -> 127 weldmers: 3 scaff_pairs: 0 total: 3 min_len: 148
+542 -> 127 weldmers: 3 scaff_pairs: 0 total: 3 min_len: 211
 548 -> 591 weldmers: 0 scaff_pairs: 3 total: 3 min_len: 160
 4 -> 431 weldmers: 0 scaff_pairs: 4 total: 4 min_len: 187
 584 -> 648 weldmers: 0 scaff_pairs: 2 total: 2 min_len: 105
@@ -32,7 +32,7 @@
 78 -> 463 weldmers: 3 scaff_pairs: 0 total: 3 min_len: 103
 330 -> 426 weldmers: 0 scaff_pairs: 2 total: 2 min_len: 106
 99 -> 33 weldmers: 0 scaff_pairs: 2 total: 2 min_len: 264
-127 -> 542 weldmers: 3 scaff_pairs: 0 total: 3 min_len: 148
+127 -> 542 weldmers: 3 scaff_pairs: 0 total: 3 min_len: 211
 131 -> 413 weldmers: 0 scaff_pairs: 2 total: 2 min_len: 138
 208 -> 1 weldmers: 0 scaff_pairs: 3 total: 3 min_len: 195
 218 -> 800 weldmers: 2 scaff_pairs: 0 total: 2 min_len: 108
@@ -43,8 +43,8 @@
 279 -> 13 weldmers: 3 scaff_pairs: 0 total: 3 min_len: 69
 413 -> 31 weldmers: 0 scaff_pairs: 3 total: 3 min_len: 124
 413 -> 131 weldmers: 0 scaff_pairs: 2 total: 2 min_len: 138
-375 -> 279 weldmers: 0 scaff_pairs: 3 total: 3 min_len: 69
 375 -> 13 weldmers: 0 scaff_pairs: 3 total: 3 min_len: 108
-13 -> 701 weldmers: 4 scaff_pairs: 3 total: 7 min_len: 145
+375 -> 279 weldmers: 0 scaff_pairs: 3 total: 3 min_len: 69
 13 -> 375 weldmers: 0 scaff_pairs: 3 total: 3 min_len: 108
+13 -> 701 weldmers: 4 scaff_pairs: 3 total: 7 min_len: 145
 13 -> 279 weldmers: 3 scaff_pairs: 0 total: 3 min_len: 69

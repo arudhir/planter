@@ -16,4 +16,5 @@ rule all:
         expand(rules.fastp_raw.output, sample=samples),
         expand(rules.trimmomatic.output, sample=samples),
         expand(rules.fastp_trimmed.output, sample=samples),
-        expand(rules.trinity.output, sample=samples)
+        expand(rules.trinity.output, sample=samples),
+        expand(rules.transdecoder.output, sample=samples)

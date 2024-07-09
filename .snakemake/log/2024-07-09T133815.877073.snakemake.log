@@ -1,0 +1,40 @@
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 8
+Rules claiming more threads will be scaled down.
+Job stats:
+job             count
+------------  -------
+all                 1
+transdecoder        1
+total               2
+
+Select jobs to execute...
+Execute 1 jobs...
+
+[Tue Jul  9 13:38:15 2024]
+localrule transdecoder:
+    input: outputs/trinity/SRR2103848_first5k_trinity/Trinity.tmp.fasta
+    output: outputs/transdecoder/SRR2103848_first5k_transdecoder, outputs/transdecoder/SRR2103848_first5k_transdecoder/longest_orfs.cds, outputs/transdecoder/SRR2103848_first5k_transdecoder/longest_orfs.gff3, outputs/transdecoder/SRR2103848_first5k_transdecoder/longest_orfs.pep
+    jobid: 11
+    reason: Missing output files: outputs/transdecoder/SRR2103848_first5k_transdecoder/longest_orfs.pep, outputs/transdecoder/SRR2103848_first5k_transdecoder/longest_orfs.cds, outputs/transdecoder/SRR2103848_first5k_transdecoder, outputs/transdecoder/SRR2103848_first5k_transdecoder/longest_orfs.gff3
+    wildcards: sample=SRR2103848_first5k
+    resources: tmpdir=/tmp
+
+[Tue Jul  9 13:38:17 2024]
+Finished job 11.
+1 of 2 steps (50%) done
+Select jobs to execute...
+Execute 1 jobs...
+
+[Tue Jul  9 13:38:17 2024]
+localrule all:
+    input: outputs/illumina/raw/SRR2103848_first5k_1.fastq.gz, outputs/illumina/raw/SRR2103848_second5k_1.fastq.gz, outputs/illumina/raw/SRR2103848_first5k_2.fastq.gz, outputs/illumina/raw/SRR2103848_second5k_2.fastq.gz, outputs/illumina/fastp_raw/SRR2103848_first5k.1.fq.gz, outputs/illumina/fastp_raw/SRR2103848_second5k.1.fq.gz, outputs/illumina/fastp_raw/SRR2103848_first5k.2.fq.gz, outputs/illumina/fastp_raw/SRR2103848_second5k.2.fq.gz, outputs/illumina/fastp_raw/SRR2103848_first5k_fastp.json, outputs/illumina/fastp_raw/SRR2103848_second5k_fastp.json, outputs/illumina/fastp_raw/SRR2103848_first5k_fastp.html, outputs/illumina/fastp_raw/SRR2103848_second5k_fastp.html, outputs/illumina/trimmed/SRR2103848_first5k_trimmed.1.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.1.fq.gz, outputs/illumina/trimmed/SRR2103848_first5k_trimmed.1u.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.1u.fq.gz, outputs/illumina/trimmed/SRR2103848_first5k_trimmed.2.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.2.fq.gz, outputs/illumina/trimmed/SRR2103848_first5k_trimmed.2u.fq.gz, outputs/illumina/trimmed/SRR2103848_second5k_trimmed.2u.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_first5k.1.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_second5k.1.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_first5k.2.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_second5k.2.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_first5k_fastp.json, outputs/illumina/fastp_trimmed/SRR2103848_second5k_fastp.json, outputs/illumina/fastp_trimmed/SRR2103848_first5k_fastp.html, outputs/illumina/fastp_trimmed/SRR2103848_second5k_fastp.html, outputs/trinity/SRR2103848_first5k_trinity, outputs/trinity/SRR2103848_second5k_trinity, outputs/trinity/SRR2103848_first5k_trinity/Trinity.tmp.fasta, outputs/trinity/SRR2103848_second5k_trinity/Trinity.tmp.fasta, outputs/transdecoder/SRR2103848_first5k_transdecoder, outputs/transdecoder/SRR2103848_second5k_transdecoder, outputs/transdecoder/SRR2103848_first5k_transdecoder/longest_orfs.cds, outputs/transdecoder/SRR2103848_second5k_transdecoder/longest_orfs.cds, outputs/transdecoder/SRR2103848_first5k_transdecoder/longest_orfs.gff3, outputs/transdecoder/SRR2103848_second5k_transdecoder/longest_orfs.gff3, outputs/transdecoder/SRR2103848_first5k_transdecoder/longest_orfs.pep, outputs/transdecoder/SRR2103848_second5k_transdecoder/longest_orfs.pep
+    jobid: 0
+    reason: Input files updated by another job: outputs/transdecoder/SRR2103848_first5k_transdecoder/longest_orfs.pep, outputs/transdecoder/SRR2103848_first5k_transdecoder/longest_orfs.cds, outputs/transdecoder/SRR2103848_first5k_transdecoder, outputs/transdecoder/SRR2103848_first5k_transdecoder/longest_orfs.gff3
+    resources: tmpdir=/tmp
+
+[Tue Jul  9 13:38:17 2024]
+Finished job 0.
+2 of 2 steps (100%) done
+Complete log: .snakemake/log/2024-07-09T133815.877073.snakemake.log

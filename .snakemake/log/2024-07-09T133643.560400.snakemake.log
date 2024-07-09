@@ -1,0 +1,47 @@
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 8
+Rules claiming more threads will be scaled down.
+Job stats:
+job             count
+------------  -------
+all                 1
+transdecoder        2
+total               3
+
+Select jobs to execute...
+Execute 2 jobs...
+
+[Tue Jul  9 13:36:43 2024]
+localrule transdecoder:
+    input: outputs/trinity/SRR2103848_first5k_trinity/Trinity.tmp.fasta
+    output: outputs/transdecoder/SRR2103848_first5k_transdecoder, outputs/transdecoder/SRR2103848_first5k_transdecoder/longest_orfs.cds, outputs/transdecoder/SRR2103848_first5k_transdecoder/longest_orfs.gff3, outputs/transdecoder/SRR2103848_first5k_transdecoder/longest_orfs.pep
+    jobid: 11
+    reason: Missing output files: outputs/transdecoder/SRR2103848_first5k_transdecoder/longest_orfs.gff3, outputs/transdecoder/SRR2103848_first5k_transdecoder, outputs/transdecoder/SRR2103848_first5k_transdecoder/longest_orfs.cds, outputs/transdecoder/SRR2103848_first5k_transdecoder/longest_orfs.pep
+    wildcards: sample=SRR2103848_first5k
+    resources: tmpdir=/tmp
+
+
+[Tue Jul  9 13:36:43 2024]
+localrule transdecoder:
+    input: outputs/trinity/SRR2103848_second5k_trinity/Trinity.tmp.fasta
+    output: outputs/transdecoder/SRR2103848_second5k_transdecoder, outputs/transdecoder/SRR2103848_second5k_transdecoder/longest_orfs.cds, outputs/transdecoder/SRR2103848_second5k_transdecoder/longest_orfs.gff3, outputs/transdecoder/SRR2103848_second5k_transdecoder/longest_orfs.pep
+    jobid: 12
+    reason: Missing output files: outputs/transdecoder/SRR2103848_second5k_transdecoder, outputs/transdecoder/SRR2103848_second5k_transdecoder/longest_orfs.gff3, outputs/transdecoder/SRR2103848_second5k_transdecoder/longest_orfs.pep, outputs/transdecoder/SRR2103848_second5k_transdecoder/longest_orfs.cds
+    wildcards: sample=SRR2103848_second5k
+    resources: tmpdir=/tmp
+
+[Tue Jul  9 13:36:44 2024]
+Error in rule transdecoder:
+    jobid: 11
+    input: outputs/trinity/SRR2103848_first5k_trinity/Trinity.tmp.fasta
+    output: outputs/transdecoder/SRR2103848_first5k_transdecoder, outputs/transdecoder/SRR2103848_first5k_transdecoder/longest_orfs.cds, outputs/transdecoder/SRR2103848_first5k_transdecoder/longest_orfs.gff3, outputs/transdecoder/SRR2103848_first5k_transdecoder/longest_orfs.pep
+
+[Tue Jul  9 13:36:44 2024]
+Finished job 12.
+1 of 3 steps (33%) done
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look above for error message
+Complete log: .snakemake/log/2024-07-09T133643.560400.snakemake.log
+WorkflowError:
+At least one job did not complete successfully.

@@ -1,5 +1,5 @@
 TRINITY_OUT_DIR = Path(config['outdir']) / 'trinity'
-
+TRANSDECODER_OUT_DIR = Path(config['outdir']) / 'transdecoder'
 rule trinity:
     input:
         r1 = rules.trimmomatic.output.r1,
@@ -17,9 +17,28 @@ rule trinity:
             '--right {input.r2} '
         )
 
-#rule transdecoder:
-#    pass
-#
+rule transdecoder:
+    input:
+        trinity_fasta = rules.trinity.output.trinity_fasta
+    output:
+        outdir = directory(TRANSDECODER_OUT_DIR / '{sample}_transdecoder'),
+        longest_orfs = (TRANSDECODER_OUT_DIR / '{sample}_transdecoder') / 'longest_orfs.cds',
+        longest_orfs_gff3 = (TRANSDECODER_OUT_DIR / '{sample}_transdecoder') / 'longest_orfs.gff3',
+        longest_orfs_pep = (TRANSDECODER_OUT_DIR / '{sample}_transdecoder') / 'longest_orfs.pep',
+    run:
+        shell(
+            """
+            TransDecoder.LongOrfs -t {input.trinity_fasta} -O {output.outdir}
+            """
+        )
+
+        shell(
+            """
+            TransDecoder.Predict -t {input.trinity_fasta} --no_refine_starts -O {output.outdir}
+            """
+        )
+
+
 #rule busco:
 #    pass
 #
