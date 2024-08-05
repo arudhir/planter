@@ -2,13 +2,36 @@ ILMN_READ_DIR = Path(config['outdir']) / 'illumina'
 
 rule download_reads:
     output:
-        r1 = ILMN_READ_DIR / 'raw/{sample}_1.fastq.gz',
-        r2 = ILMN_READ_DIR / 'raw/{sample}_2.fastq.gz'
+        r1 = ILMN_READ_DIR / "raw/{sample}_1.fastq",
+        r2 = ILMN_READ_DIR / "raw/{sample}_2.fastq"
+    params:
+        outdir = ILMN_READ_DIR / 'raw'
+    run:
+        shell(
+            """
+            fasterq-dump --split-files {wildcards.sample} -O {params.outdir}
+            """
+        )
 
-rule fastp_raw:
+rule compress_reads:
     input:
         r1 = rules.download_reads.output.r1,
         r2 = rules.download_reads.output.r2
+    output:
+        r1 = ILMN_READ_DIR / "raw/{sample}_1.fastq.gz",
+        r2 = ILMN_READ_DIR / "raw/{sample}_2.fastq.gz"
+    run:
+        shell(
+            """
+            pigz {input.r1}
+            pigz {input.r2}
+            """
+        )
+
+rule fastp_raw:
+    input:
+        r1 = rules.compress_reads.output.r1,
+        r2 = rules.compress_reads.output.r2
     output:
         r1 = (ILMN_READ_DIR / 'fastp_raw/{sample}.1.fq.gz'),
         r2 = (ILMN_READ_DIR / 'fastp_raw/{sample}.2.fq.gz'),

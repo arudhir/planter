@@ -1,0 +1,139 @@
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 8
+Rules claiming more threads will be scaled down.
+Job stats:
+job               count
+--------------  -------
+all                   1
+compress_reads        1
+download_reads        1
+fastp_raw             1
+fastp_trimmed         1
+transdecoder          1
+trimmomatic           1
+trinity               1
+total                 8
+
+Select jobs to execute...
+Execute 1 jobs...
+
+[Wed Jul 10 02:57:55 2024]
+localrule download_reads:
+    output: outputs/illumina/raw/SRR2103848_1.fastq, outputs/illumina/raw/SRR2103848_2.fastq
+    jobid: 1
+    reason: Missing output files: outputs/illumina/raw/SRR2103848_2.fastq, outputs/illumina/raw/SRR2103848_1.fastq
+    wildcards: sample=SRR2103848
+    resources: tmpdir=/tmp
+
+[Wed Jul 10 03:01:37 2024]
+Finished job 1.
+1 of 8 steps (12%) done
+Select jobs to execute...
+Execute 1 jobs...
+
+[Wed Jul 10 03:01:38 2024]
+localrule compress_reads:
+    input: outputs/illumina/raw/SRR2103848_1.fastq, outputs/illumina/raw/SRR2103848_2.fastq
+    output: outputs/illumina/raw/SRR2103848_1.fastq.gz, outputs/illumina/raw/SRR2103848_2.fastq.gz
+    jobid: 3
+    reason: Input files updated by another job: outputs/illumina/raw/SRR2103848_2.fastq, outputs/illumina/raw/SRR2103848_1.fastq
+    wildcards: sample=SRR2103848
+    resources: tmpdir=/tmp
+
+[Wed Jul 10 03:02:33 2024]
+Finished job 3.
+2 of 8 steps (25%) done
+Select jobs to execute...
+Execute 1 jobs...
+
+[Wed Jul 10 03:02:33 2024]
+localrule fastp_raw:
+    input: outputs/illumina/raw/SRR2103848_1.fastq.gz, outputs/illumina/raw/SRR2103848_2.fastq.gz
+    output: outputs/illumina/fastp_raw/SRR2103848.1.fq.gz, outputs/illumina/fastp_raw/SRR2103848.2.fq.gz, outputs/illumina/fastp_raw/SRR2103848_fastp.json, outputs/illumina/fastp_raw/SRR2103848_fastp.html
+    jobid: 2
+    reason: Input files updated by another job: outputs/illumina/raw/SRR2103848_1.fastq.gz, outputs/illumina/raw/SRR2103848_2.fastq.gz
+    wildcards: sample=SRR2103848
+    threads: 8
+    resources: tmpdir=/tmp
+
+[Wed Jul 10 03:03:30 2024]
+Finished job 2.
+3 of 8 steps (38%) done
+Select jobs to execute...
+Execute 1 jobs...
+
+[Wed Jul 10 03:03:30 2024]
+localrule trimmomatic:
+    input: outputs/illumina/fastp_raw/SRR2103848.1.fq.gz, outputs/illumina/fastp_raw/SRR2103848.2.fq.gz
+    output: outputs/illumina/trimmed/SRR2103848_trimmed.1.fq.gz, outputs/illumina/trimmed/SRR2103848_trimmed.1u.fq.gz, outputs/illumina/trimmed/SRR2103848_trimmed.2.fq.gz, outputs/illumina/trimmed/SRR2103848_trimmed.2u.fq.gz
+    jobid: 4
+    reason: Input files updated by another job: outputs/illumina/fastp_raw/SRR2103848.2.fq.gz, outputs/illumina/fastp_raw/SRR2103848.1.fq.gz
+    wildcards: sample=SRR2103848
+    threads: 8
+    resources: tmpdir=/tmp
+
+[Wed Jul 10 03:08:19 2024]
+Finished job 4.
+4 of 8 steps (50%) done
+Select jobs to execute...
+Execute 1 jobs...
+
+[Wed Jul 10 03:08:19 2024]
+localrule trinity:
+    input: outputs/illumina/trimmed/SRR2103848_trimmed.1.fq.gz, outputs/illumina/trimmed/SRR2103848_trimmed.2.fq.gz
+    output: outputs/trinity/SRR2103848_trinity, outputs/trinity/SRR2103848_trinity/Trinity.tmp.fasta
+    jobid: 6
+    reason: Forced execution
+    wildcards: sample=SRR2103848
+    resources: tmpdir=/tmp
+
+[Wed Jul 10 11:58:08 2024]
+Finished job 6.
+5 of 8 steps (62%) done
+Select jobs to execute...
+Execute 1 jobs...
+
+[Wed Jul 10 11:58:08 2024]
+localrule fastp_trimmed:
+    input: outputs/illumina/trimmed/SRR2103848_trimmed.1.fq.gz, outputs/illumina/trimmed/SRR2103848_trimmed.2.fq.gz
+    output: outputs/illumina/fastp_trimmed/SRR2103848.1.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848.2.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_fastp.json, outputs/illumina/fastp_trimmed/SRR2103848_fastp.html
+    jobid: 5
+    reason: Missing output files: outputs/illumina/fastp_trimmed/SRR2103848_fastp.json, outputs/illumina/fastp_trimmed/SRR2103848.1.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848.2.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_fastp.html; Input files updated by another job: outputs/illumina/trimmed/SRR2103848_trimmed.2.fq.gz, outputs/illumina/trimmed/SRR2103848_trimmed.1.fq.gz
+    wildcards: sample=SRR2103848
+    threads: 8
+    resources: tmpdir=/tmp
+
+[Wed Jul 10 11:59:05 2024]
+Finished job 5.
+6 of 8 steps (75%) done
+Select jobs to execute...
+Execute 1 jobs...
+
+[Wed Jul 10 11:59:05 2024]
+localrule transdecoder:
+    input: outputs/trinity/SRR2103848_trinity/Trinity.tmp.fasta
+    output: outputs/transdecoder/SRR2103848_transdecoder, outputs/transdecoder/SRR2103848_transdecoder/longest_orfs.cds, outputs/transdecoder/SRR2103848_transdecoder/longest_orfs.gff3, outputs/transdecoder/SRR2103848_transdecoder/longest_orfs.pep
+    jobid: 7
+    reason: Missing output files: outputs/transdecoder/SRR2103848_transdecoder/longest_orfs.pep, outputs/transdecoder/SRR2103848_transdecoder, outputs/transdecoder/SRR2103848_transdecoder/longest_orfs.cds, outputs/transdecoder/SRR2103848_transdecoder/longest_orfs.gff3; Input files updated by another job: outputs/trinity/SRR2103848_trinity/Trinity.tmp.fasta
+    wildcards: sample=SRR2103848
+    resources: tmpdir=/tmp
+
+[Wed Jul 10 12:11:40 2024]
+Finished job 7.
+7 of 8 steps (88%) done
+Select jobs to execute...
+Execute 1 jobs...
+
+[Wed Jul 10 12:11:40 2024]
+localrule all:
+    input: outputs/illumina/raw/SRR2103848_1.fastq, outputs/illumina/raw/SRR2103848_2.fastq, outputs/illumina/fastp_raw/SRR2103848.1.fq.gz, outputs/illumina/fastp_raw/SRR2103848.2.fq.gz, outputs/illumina/fastp_raw/SRR2103848_fastp.json, outputs/illumina/fastp_raw/SRR2103848_fastp.html, outputs/illumina/trimmed/SRR2103848_trimmed.1.fq.gz, outputs/illumina/trimmed/SRR2103848_trimmed.1u.fq.gz, outputs/illumina/trimmed/SRR2103848_trimmed.2.fq.gz, outputs/illumina/trimmed/SRR2103848_trimmed.2u.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848.1.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848.2.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_fastp.json, outputs/illumina/fastp_trimmed/SRR2103848_fastp.html, outputs/trinity/SRR2103848_trinity, outputs/trinity/SRR2103848_trinity/Trinity.tmp.fasta, outputs/transdecoder/SRR2103848_transdecoder, outputs/transdecoder/SRR2103848_transdecoder/longest_orfs.cds, outputs/transdecoder/SRR2103848_transdecoder/longest_orfs.gff3, outputs/transdecoder/SRR2103848_transdecoder/longest_orfs.pep
+    jobid: 0
+    reason: Input files updated by another job: outputs/illumina/trimmed/SRR2103848_trimmed.2.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848.2.fq.gz, outputs/illumina/trimmed/SRR2103848_trimmed.2u.fq.gz, outputs/illumina/fastp_trimmed/SRR2103848_fastp.html, outputs/illumina/fastp_raw/SRR2103848_fastp.json, outputs/illumina/trimmed/SRR2103848_trimmed.1u.fq.gz, outputs/illumina/fastp_raw/SRR2103848.2.fq.gz, outputs/transdecoder/SRR2103848_transdecoder/longest_orfs.gff3, outputs/illumina/trimmed/SRR2103848_trimmed.1.fq.gz, outputs/illumina/fastp_raw/SRR2103848.1.fq.gz, outputs/transdecoder/SRR2103848_transdecoder/longest_orfs.cds, outputs/illumina/raw/SRR2103848_2.fastq, outputs/illumina/fastp_raw/SRR2103848_fastp.html, outputs/illumina/raw/SRR2103848_1.fastq, outputs/illumina/fastp_trimmed/SRR2103848_fastp.json, outputs/trinity/SRR2103848_trinity, outputs/transdecoder/SRR2103848_transdecoder, outputs/illumina/fastp_trimmed/SRR2103848.1.fq.gz, outputs/transdecoder/SRR2103848_transdecoder/longest_orfs.pep, outputs/trinity/SRR2103848_trinity/Trinity.tmp.fasta
+    resources: tmpdir=/tmp
+
+Waiting at most 5 seconds for missing files.
+WorkflowError in rule all in file /home/ubuntu/planter/workflow/Snakefile, line 12:
+OSError: Missing files after 5 seconds. This might be due to filesystem latency. If that is the case, consider to increase the wait time with --latency-wait:
+outputs/illumina/raw/SRR2103848_1.fastq (missing locally, parent dir contents: SRR2103848_1.fastq.gz, SRR2103848_2.fastq.gz, SRR6345446_first5k_2.fastq.gz, SRR6345446_second5k_2.fastq.gz, SRR6345446_second5k_1.fastq.gz, SRR6345446_first5k_1.fastq.gz)
+outputs/illumina/raw/SRR2103848_2.fastq (missing locally, parent dir contents: SRR2103848_1.fastq.gz, SRR2103848_2.fastq.gz, SRR6345446_first5k_2.fastq.gz, SRR6345446_second5k_2.fastq.gz, SRR6345446_second5k_1.fastq.gz, SRR6345446_first5k_1.fastq.gz)

@@ -4,17 +4,16 @@ outdir = config['outdir']
 
 include: 'rules/illumina.smk'
 include: 'rules/trinity.smk'
+include: 'rules/annotate.smk'
 
-samples = [
-    'SRR2103848_first5k',
-    'SRR2103848_second5k',
-]
+samples = config['samples']
 
 rule all:
     input:
-        expand(rules.download_reads.output, sample=samples),
+        expand(rules.compress_reads.output, sample=samples),
         expand(rules.fastp_raw.output, sample=samples),
         expand(rules.trimmomatic.output, sample=samples),
         expand(rules.fastp_trimmed.output, sample=samples),
         expand(rules.trinity.output, sample=samples),
-        expand(rules.transdecoder.output, sample=samples)
+        expand(rules.transdecoder.output, sample=samples),
+        expand(rules.eggnog.output, sample=samples),

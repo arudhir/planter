@@ -100,5 +100,6 @@ tzdata==2024.1
 urllib3==2.2.1
 wcwidth==0.2.13
 wrapt==1.16.0
+XlsxWriter==3.2.0
 yte==1.5.4
 zipp==3.19.0

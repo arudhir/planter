@@ -1,12 +1,14 @@
 TRINITY_OUT_DIR = Path(config['outdir']) / 'trinity'
 TRANSDECODER_OUT_DIR = Path(config['outdir']) / 'transdecoder'
+
 rule trinity:
     input:
         r1 = rules.trimmomatic.output.r1,
         r2 = rules.trimmomatic.output.r2
     output:
         trinity_outdir = directory(TRINITY_OUT_DIR / '{sample}_trinity'),
-        trinity_fasta = TRINITY_OUT_DIR / '{sample}_trinity/Trinity.tmp.fasta'
+        cds = TRINITY_OUT_DIR / '{sample}_trinity/Trinity.tmp.fasta',
+    threads: 8
     run:
         shell(
             'Trinity '
@@ -19,7 +21,7 @@ rule trinity:
 
 rule transdecoder:
     input:
-        trinity_fasta = rules.trinity.output.trinity_fasta
+        trinity_fasta = rules.trinity.output.cds
     output:
         outdir = directory(TRANSDECODER_OUT_DIR / '{sample}_transdecoder'),
         longest_orfs = (TRANSDECODER_OUT_DIR / '{sample}_transdecoder') / 'longest_orfs.cds',

@@ -1,0 +1,80 @@
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 16
+Rules claiming more threads will be scaled down.
+Job stats:
+job               count
+--------------  -------
+all                   1
+compress_reads        4
+download_reads        4
+eggnog                4
+fastp_raw             4
+fastp_trimmed         4
+transdecoder          4
+trimmomatic           4
+trinity               4
+total                33
+
+Select jobs to execute...
+Execute 4 jobs...
+
+[Mon Aug  5 17:54:36 2024]
+localrule download_reads:
+    output: outputs/illumina/raw/SRR29142729_1.fastq, outputs/illumina/raw/SRR29142729_2.fastq
+    jobid: 6
+    reason: Missing output files: outputs/illumina/raw/SRR29142729_1.fastq, outputs/illumina/raw/SRR29142729_2.fastq
+    wildcards: sample=SRR29142729
+    resources: tmpdir=/tmp
+
+
+[Mon Aug  5 17:54:36 2024]
+localrule download_reads:
+    output: outputs/illumina/raw/SRR8053131_1.fastq, outputs/illumina/raw/SRR8053131_2.fastq
+    jobid: 4
+    reason: Missing output files: outputs/illumina/raw/SRR8053131_1.fastq, outputs/illumina/raw/SRR8053131_2.fastq
+    wildcards: sample=SRR8053131
+    resources: tmpdir=/tmp
+
+
+[Mon Aug  5 17:54:36 2024]
+localrule download_reads:
+    output: outputs/illumina/raw/SRR5936537_1.fastq, outputs/illumina/raw/SRR5936537_2.fastq
+    jobid: 2
+    reason: Missing output files: outputs/illumina/raw/SRR5936537_2.fastq, outputs/illumina/raw/SRR5936537_1.fastq
+    wildcards: sample=SRR5936537
+    resources: tmpdir=/tmp
+
+
+[Mon Aug  5 17:54:36 2024]
+localrule download_reads:
+    output: outputs/illumina/raw/SRR22420515_1.fastq, outputs/illumina/raw/SRR22420515_2.fastq
+    jobid: 8
+    reason: Missing output files: outputs/illumina/raw/SRR22420515_1.fastq, outputs/illumina/raw/SRR22420515_2.fastq
+    wildcards: sample=SRR22420515
+    resources: tmpdir=/tmp
+
+[Mon Aug  5 17:54:37 2024]
+Error in rule download_reads:
+    jobid: 4
+    output: outputs/illumina/raw/SRR8053131_1.fastq, outputs/illumina/raw/SRR8053131_2.fastq
+
+[Mon Aug  5 17:54:37 2024]
+Error in rule download_reads:
+    jobid: 6
+    output: outputs/illumina/raw/SRR29142729_1.fastq, outputs/illumina/raw/SRR29142729_2.fastq
+
+[Mon Aug  5 17:54:37 2024]
+Error in rule download_reads:
+    jobid: 2
+    output: outputs/illumina/raw/SRR5936537_1.fastq, outputs/illumina/raw/SRR5936537_2.fastq
+
+Terminating processes on user request, this might take some time.
+[Mon Aug  5 17:54:40 2024]
+Error in rule download_reads:
+    jobid: 8
+    output: outputs/illumina/raw/SRR22420515_1.fastq, outputs/illumina/raw/SRR22420515_2.fastq
+
+Complete log: .snakemake/log/2024-08-05T175435.654047.snakemake.log
+WorkflowError:
+At least one job did not complete successfully.

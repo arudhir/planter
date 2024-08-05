@@ -1,0 +1,35 @@
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 16
+Rules claiming more threads will be scaled down.
+Job stats:
+job       count
+------  -------
+all           1
+eggnog        1
+total         2
+
+Select jobs to execute...
+Execute 1 jobs...
+
+[Mon Aug  5 17:28:31 2024]
+localrule eggnog:
+    input: outputs/transdecoder/SRR2103848_transdecoder/longest_orfs.pep
+    output: outputs/eggnog/SRR2103848_eggnog/SRR2103848_eggnog.emapper.annotations.xlsx
+    jobid: 8
+    reason: Missing output files: outputs/eggnog/SRR2103848_eggnog/SRR2103848_eggnog.emapper.annotations.xlsx
+    wildcards: sample=SRR2103848
+    threads: 16
+    resources: tmpdir=/tmp
+
+[Mon Aug  5 17:28:32 2024]
+Error in rule eggnog:
+    jobid: 8
+    input: outputs/transdecoder/SRR2103848_transdecoder/longest_orfs.pep
+    output: outputs/eggnog/SRR2103848_eggnog/SRR2103848_eggnog.emapper.annotations.xlsx
+
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look above for error message
+Complete log: .snakemake/log/2024-08-05T172831.551098.snakemake.log
+WorkflowError:
+At least one job did not complete successfully.

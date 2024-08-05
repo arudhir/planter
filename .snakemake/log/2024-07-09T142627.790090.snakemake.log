@@ -1,0 +1,37 @@
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 8
+Rules claiming more threads will be scaled down.
+Job stats:
+job               count
+--------------  -------
+all                   1
+download_reads        1
+fastp_raw             1
+fastp_trimmed         1
+transdecoder          1
+trimmomatic           1
+trinity               1
+total                 7
+
+Select jobs to execute...
+Execute 1 jobs...
+
+[Tue Jul  9 14:26:27 2024]
+localrule download_reads:
+    output: outputs/illumina/raw/SRR2103848_1.fastq.gz, outputs/illumina/raw/SRR2103848_2.fastq.gz
+    jobid: 1
+    reason: Missing output files: outputs/illumina/raw/SRR2103848_1.fastq.gz, outputs/illumina/raw/SRR2103848_2.fastq.gz
+    wildcards: sample=SRR2103848
+    resources: tmpdir=/tmp
+
+Waiting at most 5 seconds for missing files.
+MissingOutputException in rule download_reads in file /home/ubuntu/planter/workflow/rules/illumina.smk, line 3:
+Job 1  completed successfully, but some output files are missing. Missing files after 5 seconds. This might be due to filesystem latency. If that is the case, consider to increase the wait time with --latency-wait:
+outputs/illumina/raw/SRR2103848_1.fastq.gz (missing locally, parent dir contents: SRR2103848_first5k_1.fastq.gz, SRR2103848_second5k_2.fastq.gz, SRR2103848_2.fastq, SRR6345446_first5k_2.fastq.gz, SRR6345446_second5k_2.fastq.gz, SRR2103848_1.fastq, SRR6345446_second5k_1.fastq.gz, SRR6345446_first5k_1.fastq.gz, SRR2103848_third5k_2.fastq.gz, SRR2103848_second5k_1.fastq.gz, SRR2103848_third5k_1.fastq.gz, SRR2103848_first5k_2.fastq.gz)
+outputs/illumina/raw/SRR2103848_2.fastq.gz (missing locally, parent dir contents: SRR2103848_first5k_1.fastq.gz, SRR2103848_second5k_2.fastq.gz, SRR2103848_2.fastq, SRR6345446_first5k_2.fastq.gz, SRR6345446_second5k_2.fastq.gz, SRR2103848_1.fastq, SRR6345446_second5k_1.fastq.gz, SRR6345446_first5k_1.fastq.gz, SRR2103848_third5k_2.fastq.gz, SRR2103848_second5k_1.fastq.gz, SRR2103848_third5k_1.fastq.gz, SRR2103848_first5k_2.fastq.gz)
+Shutting down, this might take some time.
+Exiting because a job execution failed. Look above for error message
+Complete log: .snakemake/log/2024-07-09T142627.790090.snakemake.log
+WorkflowError:
+At least one job did not complete successfully.
