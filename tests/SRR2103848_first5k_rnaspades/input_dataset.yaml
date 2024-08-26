@@ -1,0 +1,7 @@
+- "left reads":
+  - "/home/ubuntu/planter/tests/reads/SRR2103848_first5k_1.fastq.gz"
+  "number": !!int "1"
+  "orientation": "fr"
+  "right reads":
+  - "/home/ubuntu/planter/tests/reads/SRR2103848_first5k_2.fastq.gz"
+  "type": "paired-end"

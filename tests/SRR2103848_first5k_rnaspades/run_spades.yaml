@@ -1,0 +1,101 @@
+- STAGE: Before start
+  args: []
+  config_dir: ''
+  del_after:
+  - .bin_reads
+  - tmp/spades_894q0f3p
+  - configs
+  - .bin_reads
+  - tmp/spades_9xn4jgxu
+  - configs
+  - .bin_reads
+  - tmp/spades_hagf6iiy
+  - configs
+  - .bin_reads
+  - tmp/spades_czlweu41
+  - configs
+  output_files: []
+  path: 'true'
+  short_name: before_start
+- STAGE: Assembling
+  args: []
+  config_dir: ''
+  del_after: []
+  output_files: []
+  path: 'true'
+  short_name: as_start
+- STAGE: K33
+  args:
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K33/configs/config.info
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K33/configs/mda_mode.info
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K33/configs/rna_mode.info
+  config_dir: K33
+  del_after: []
+  output_files: []
+  path: /opt/SPAdes-3.15.5-Linux/bin/spades-core
+  short_name: k33
+- STAGE: K49
+  args:
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K49/configs/config.info
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K49/configs/mda_mode.info
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K49/configs/rna_mode.info
+  config_dir: K49
+  del_after: []
+  output_files: []
+  path: /opt/SPAdes-3.15.5-Linux/bin/spades-core
+  short_name: k49
+- STAGE: Copy files
+  args:
+  - /opt/SPAdes-3.15.5-Linux/share/spades/spades_pipeline/scripts/copy_files.py
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K49/before_rr.fasta
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/before_rr.fasta
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K49/assembly_graph_after_simplification.gfa
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/assembly_graph_after_simplification.gfa
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K49/transcripts.fasta
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/transcripts.fasta
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K49/transcripts.paths
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/transcripts.paths
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K49/assembly_graph_with_scaffolds.gfa
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/assembly_graph_with_scaffolds.gfa
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K49/assembly_graph.fastg
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/assembly_graph.fastg
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K49/hard_filtered_final_paths.fasta
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/hard_filtered_transcripts.fasta
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K49/soft_filtered_final_paths.fasta
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/soft_filtered_transcripts.fasta
+  config_dir: ''
+  del_after:
+  - .bin_reads
+  - tmp/spades_lmez8bqi
+  output_files: []
+  path: /home/ubuntu/.pyenv/versions/3.12.0/bin/python
+  short_name: copy_files
+- STAGE: Assembling
+  args: []
+  config_dir: ''
+  del_after: []
+  output_files: []
+  path: 'true'
+  short_name: as_finish
+- STAGE: Breaking scaffolds
+  args:
+  - /opt/SPAdes-3.15.5-Linux/share/spades/spades_pipeline/scripts/breaking_scaffolds_script.py
+  - --result_scaffolds_filename
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/scaffolds.fasta
+  - --misc_dir
+  - /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/misc
+  - --threshold_for_breaking_scaffolds
+  - '3'
+  config_dir: ''
+  del_after: []
+  output_files: []
+  path: /home/ubuntu/.pyenv/versions/3.12.0/bin/python
+  short_name: bs
+- STAGE: Terminate
+  args: []
+  config_dir: ''
+  del_after:
+  - configs
+  output_files: []
+  path: 'true'
+  short_name: terminate

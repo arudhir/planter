@@ -1,2 +1,4 @@
 outputs/*
 tests/test-output
+references/*
+.snakemake

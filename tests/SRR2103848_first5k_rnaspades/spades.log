@@ -1,0 +1,91 @@
+Command line: /opt/SPAdes-3.15.5-Linux/bin/rnaspades.py	-1	/home/ubuntu/planter/tests/reads/SRR2103848_first5k_1.fastq.gz	-2	/home/ubuntu/planter/tests/reads/SRR2103848_first5k_2.fastq.gz	-o	/home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades	
+
+System information:
+  SPAdes version: 3.15.5
+  Python version: 3.12.0
+  OS: Linux-6.8.0-1012-aws-x86_64-with-glibc2.39
+
+Output dir: /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades
+Debug mode is turned OFF
+
+Dataset parameters:
+  RNA-seq mode
+  Reads:
+    Library number: 1, library type: paired-end
+      orientation: fr
+      left reads: ['/home/ubuntu/planter/tests/reads/SRR2103848_first5k_1.fastq.gz']
+      right reads: ['/home/ubuntu/planter/tests/reads/SRR2103848_first5k_2.fastq.gz']
+      interlaced reads: not specified
+      single reads: not specified
+      merged reads: not specified
+Assembly parameters:
+  k: automatic selection based on read length
+  Repeat resolution is enabled
+  Mismatch careful mode is turned OFF
+  MismatchCorrector will be SKIPPED
+  Coverage cutoff is turned OFF
+Other parameters:
+  Dir for temp files: /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/tmp
+  Threads: 16
+  Memory limit (in Gb): 30
+
+
+======= SPAdes pipeline started. Log can be found here: /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/spades.log
+
+/home/ubuntu/planter/tests/reads/SRR2103848_first5k_1.fastq.gz: max reads length: 100
+/home/ubuntu/planter/tests/reads/SRR2103848_first5k_2.fastq.gz: max reads length: 100
+
+Reads length: 100
+
+K values to be used: [33, 49]
+
+===== Before start started. 
+
+
+===== Assembling started. 
+
+
+===== K33 started. 
+
+
+== Running: /opt/SPAdes-3.15.5-Linux/bin/spades-core /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K33/configs/config.info /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K33/configs/mda_mode.info /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K33/configs/rna_mode.info
+
+  0:00:00.000     1M / 21M   INFO    General                 (main.cpp                  :  99)   Loaded config from /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K33/configs/config.info
+  0:00:00.024     1M / 21M   INFO    General                 (main.cpp                  :  99)   Loaded config from /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K33/configs/mda_mode.info
+  0:00:00.032     1M / 21M   INFO    General                 (main.cpp                  :  99)   Loaded config from /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K33/configs/rna_mode.info
+  0:00:00.047     1M / 21M   INFO    General                 (memory_limit.cpp          :  54)   Memory limit set to 30 Gb
+  0:00:00.064     1M / 21M   INFO    General                 (main.cpp                  : 107)   Starting SPAdes, built from refs/heads/spades_3.15.5, git revision e757b8216f9a038fb616e9551a2d4891b2d19ad7
+  0:00:00.072     1M / 21M   INFO    General                 (main.cpp                  : 108)   Maximum k-mer length: 128
+  0:00:00.082     1M / 21M   INFO    General                 (main.cpp                  : 109)   Assembling dataset (/home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/dataset.info) with K=33
+  0:00:00.089     1M / 21M   INFO    General                 (main.cpp                  : 110)   Maximum # of threads to use (adjusted due to OMP capabilities): 16
+  0:00:00.095     1M / 21M   INFO    General                 (pipeline.cpp              : 212)   SPAdes started
+  0:00:00.102     1M / 21M   INFO    General                 (pipeline.cpp              : 225)   Starting from stage: read_conversion
+  0:00:00.113     1M / 21M   INFO    General                 (pipeline.cpp              : 231)   Two-step repeat resolution disabled
+  0:00:00.123     1M / 21M   INFO   GraphCore                (graph_core.hpp            : 672)   Graph created, vertex min_id: 3, edge min_id: 3
+  0:00:00.134     1M / 21M   INFO   GraphCore                (graph_core.hpp            : 673)   Vertex size: 48, edge size: 40
+  0:00:00.142     1M / 21M   INFO    General                 (edge_index.hpp            : 113)   Size of edge index entries: 12/8
+  0:00:00.154     1M / 21M   INFO   StageManager             (stage.cpp                 : 185)   STAGE == Binary Read Conversion (id: read_conversion)
+  0:00:00.174     1M / 21M   INFO    General                 (read_converter.cpp        :  72)   Converting reads to binary format for library #0 (takes a while)
+  0:00:00.179     1M / 21M   INFO    General                 (read_converter.cpp        :  73)   Converting paired reads
+  0:00:00.215    21M / 21M   INFO    General                 (binary_converter.cpp      : 111)   5000 reads written
+  0:00:00.222    14M / 21M   INFO    General                 (read_converter.cpp        :  86)   Converting single reads
+  0:00:00.229    17M / 21M   INFO    General                 (binary_converter.cpp      : 111)   0 reads written
+  0:00:00.239    14M / 21M   INFO    General                 (read_converter.cpp        :  92)   Converting merged reads
+  0:00:00.247    17M / 21M   INFO    General                 (binary_converter.cpp      : 111)   0 reads written
+  0:00:00.260     1M / 21M   INFO   StageManager             (stage.cpp                 : 185)   STAGE == de Bruijn graph construction (id: construction)
+  0:00:00.270     1M / 21M   INFO    General                 (construction.cpp          : 153)   Max read length 100
+  0:00:00.274     1M / 21M   INFO    General                 (construction.cpp          : 159)   Average read length 99.9122
+  0:00:00.281     1M / 21M   INFO    General                 (stage.cpp                 : 117)   PROCEDURE == k+1-mer counting (id: construction:kpomer_counting)
+  0:00:00.291     1M / 21M   INFO    General                 (kmer_index_builder.hpp    : 243)   Splitting kmer instances into 160 files using 16 threads. This might take a while.
+
+
+== Error ==  system call for: "['/opt/SPAdes-3.15.5-Linux/bin/spades-core', '/home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K33/configs/config.info', '/home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K33/configs/mda_mode.info', '/home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/K33/configs/rna_mode.info']" finished abnormally, OS return value: -11
+
+
+In case you have troubles running SPAdes, you can write to spades.support@cab.spbu.ru
+or report an issue on our GitHub repository github.com/ablab/spades
+Please provide us with params.txt and spades.log files from the output directory.
+
+SPAdes log can be found here: /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/spades.log
+
+Thank you for using SPAdes!

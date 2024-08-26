@@ -1,0 +1,31 @@
+Command line: /opt/SPAdes-3.15.5-Linux/bin/rnaspades.py	-1	/home/ubuntu/planter/tests/reads/SRR2103848_first5k_1.fastq.gz	-2	/home/ubuntu/planter/tests/reads/SRR2103848_first5k_2.fastq.gz	-o	/home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades	
+
+System information:
+  SPAdes version: 3.15.5
+  Python version: 3.12.0
+  OS: Linux-6.8.0-1012-aws-x86_64-with-glibc2.39
+
+Output dir: /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades
+Debug mode is turned OFF
+
+Dataset parameters:
+  RNA-seq mode
+  Reads:
+    Library number: 1, library type: paired-end
+      orientation: fr
+      left reads: ['/home/ubuntu/planter/tests/reads/SRR2103848_first5k_1.fastq.gz']
+      right reads: ['/home/ubuntu/planter/tests/reads/SRR2103848_first5k_2.fastq.gz']
+      interlaced reads: not specified
+      single reads: not specified
+      merged reads: not specified
+Assembly parameters:
+  k: automatic selection based on read length
+  Repeat resolution is enabled
+  Mismatch careful mode is turned OFF
+  MismatchCorrector will be SKIPPED
+  Coverage cutoff is turned OFF
+Other parameters:
+  Dir for temp files: /home/ubuntu/planter/tests/SRR2103848_first5k_rnaspades/tmp
+  Threads: 16
+  Memory limit (in Gb): 30
+

@@ -2,18 +2,17 @@
 configfile: "workflow/config.yaml"
 outdir = config['outdir']
 
-include: 'rules/illumina.smk'
-include: 'rules/trinity.smk'
+include: 'rules/reads.smk'
+include: 'rules/assembly.smk'
 include: 'rules/annotate.smk'
 
 samples = config['samples']
 
 rule all:
     input:
-        expand(rules.compress_reads.output, sample=samples),
-        expand(rules.fastp_raw.output, sample=samples),
-        expand(rules.trimmomatic.output, sample=samples),
-        expand(rules.fastp_trimmed.output, sample=samples),
-        expand(rules.trinity.output, sample=samples),
-        expand(rules.transdecoder.output, sample=samples),
+        # expand(rules.compress_reads.output, sample=samples),
+        # expand(rules.fastp_raw.output, sample=samples),
+        # expand(rules.fastp_processed.output, sample=samples),
+        expand(rules.rnaspades.output, sample=samples),
+        # expand(rules.transdecoder.output, sample=samples),
         expand(rules.eggnog.output, sample=samples),
