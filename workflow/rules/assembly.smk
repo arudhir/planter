@@ -25,28 +25,33 @@ rule rnaspades:
         r1 = rules.fastp_processed.output.r1,
         r2 = rules.fastp_processed.output.r2
     output:
-        rnaspades_outdir = directory(RNASPADES_OUT_DIR / '{sample}_rnaspades'),
-        fasta = RNASPADES_OUT_DIR / '{sample}_rnaspades/{sample}_transcripts.fasta'
+        fasta = RNASPADES_OUT_DIR / '{sample}_rnaspades/transcripts.fasta'
     params:
-        original_fasta_filename = RNASPADES_OUT_DIR / '{sample}/transcripts.fasta',
-        memory = 25
-    threads: workflow.cores
+        memory = 13,
+        rnaspades_outdir = directory(RNASPADES_OUT_DIR / '{sample}_rnaspades'),
+    threads: workflow.cores / 2
     run:
         shell(
             'rnaspades.py '
             '-1 {input.r1} '
             '-2 {input.r2} '
-            '-o {output.rnaspades_outdir} '
+            '-o {params.rnaspades_outdir} '
+            '--checkpoints last '
             '--threads {threads} '
             '--memory {params.memory}'
         )
 
-        shell('mv {params.original_fasta_filename} {output.fasta}')
-
+rule rename_assembly:
+    input:
+        original = rules.rnaspades.output.fasta
+    output:
+        renamed = RNASPADES_OUT_DIR / '{sample}_rnaspades/{sample}_transcripts.fasta'
+    run:
+        os.rename(input.original, output.renamed)
 
 rule transdecoder:
     input:
-        fasta = rules.rnaspades.output.fasta
+        fasta = rules.rename_assembly.output.renamed
     output:
         outdir = directory(TRANSDECODER_OUT_DIR / '{sample}_transdecoder'),
         longest_orfs = (TRANSDECODER_OUT_DIR / '{sample}_transdecoder') / 'longest_orfs.cds',
