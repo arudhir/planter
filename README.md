@@ -1,6 +1,7 @@
 # planter
 
-
+![full](images/planter.png "planter")
+![dag](images/dag.png "dag")
 
 
 
