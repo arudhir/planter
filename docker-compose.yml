@@ -1,0 +1,13 @@
+version: '2'
+services:
+  pteryx:
+    build: .
+    image: pteryx
+    stdin_open: True
+    tty: True
+    volumes:
+      - ./pteryx/workflow:/pteryx/workflow
+      - ./tests:/usr/src/pteryx/tests
+      - ./tests/fixtures/mesoplasma:/pteryx/inputs
+      - ./outputs:/pteryx/outputs
+      - .:/usr/src/pteryx

@@ -12,11 +12,11 @@
 .SHELLFLAGS = -cB
 SHELL = /bin/bash
 
-PROJECT_SLUG = transxpress
+PROJECT_SLUG = planter
 BUILD_IMAGE ?= $(PROJECT_SLUG)
 
-# CI_PROJECT_PATH ?= ngs-analysis/$(PROJECT_SLUG)
-# APP_HOME ?= /usr/src/$(PROJECT_SLUG)
+CI_PROJECT_PATH ?= ngs-analysis/$(PROJECT_SLUG)
+APP_HOME ?= /usr/src/$(PROJECT_SLUG)
 
 help:
 	@echo
@@ -65,7 +65,7 @@ install: dist
 	pip install -e .
 
 release: dist
-	twine upload dist/* --verbose --username admin --password password
+	twine upload dist/* --verbose
 
 # --- Cleanup ---
 
@@ -84,19 +84,28 @@ clean-pyc:
 # --- Docker image ---
 
 image:
-	COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 docker-compose build
+	docker-compose build
 	#docker build --pull -t $(BUILD_IMAGE) .
-	@echo built ${PROJECT_SLUG} image as $(BUILD_IMAGE)
+	@echo built planter image as $(BUILD_IMAGE)
 
 tag: image
 	docker tag $(BUILD_IMAGE) $(TAG_IMAGE)
-	@echo tagged ${PROJECT_SLUG} image as $(TAG_IMAGE)
+	@echo tagged planter image as $(TAG_IMAGE)
 
 push: push_image = $(if $(TAG_IMAGE),$(TAG_IMAGE),$(BUILD_IMAGE))
 push:
 	docker push $(push_image)
-	@echo pushed ${PROJECT_SLUG} image as $(push_image)
+	@echo pushed planter image as $(push_image)
 
+deploy: image
+	docker tag \
+		$(BUILD_IMAGE) \
+		docker.arudhir.com/$(CI_PROJECT_PATH)
+	@echo tagged planter image
+	docker push \
+		docker.arudhir.com/$(CI_PROJECT_PATH)
+	@echo pushed planter image
+	
 # --- Testing ---
 
 test:
@@ -108,5 +117,5 @@ test-all:
 # --- Running ---
 
 bash:
-	docker-compose run --rm ${PROJECT_SLUG} bash
+	docker-compose run --rm planter bash
 #vim: set noet
