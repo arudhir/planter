@@ -1,3 +1,6 @@
+import shutil
+from pathlib import Path
+
 TRINITY_OUT_DIR = Path(config['outdir']) / 'trinity'
 RNASPADES_OUT_DIR = Path(config['outdir']) / 'rnaspades'
 TRANSDECODER_OUT_DIR = Path(config['outdir']) / 'transdecoder'
@@ -7,8 +10,8 @@ rule trinity:
         r1 = rules.fastp_processed.output.r1,
         r2 = rules.fastp_processed.output.r2
     output:
-        trinity_outdir = directory(TRINITY_OUT_DIR / '{sample}_trinity'),
-        fasta = TRINITY_OUT_DIR / '{sample}_trinity/Trinity.tmp.fasta',
+        trinity_outdir = directory(Path(config['outdir']) / '{sample}/trinity'),
+        fasta = Path(config['outdir']) / '{sample}/trinity/Trinity.tmp.fasta',
     threads: workflow.cores
     run:
         shell(
@@ -25,10 +28,10 @@ rule rnaspades:
         r1 = rules.fastp_processed.output.r1,
         r2 = rules.fastp_processed.output.r2
     output:
-        fasta = RNASPADES_OUT_DIR / '{sample}_rnaspades/transcripts.fasta'
+        fasta = Path(config['outdir']) / '{sample}/rnaspades/transcripts.fasta'
     params:
         memory = 13,
-        rnaspades_outdir = directory(RNASPADES_OUT_DIR / '{sample}_rnaspades'),
+        rnaspades_outdir = directory(Path(config['outdir']) / '{sample}/rnaspades'),
     threads: workflow.cores / 2
     run:
         shell(
@@ -45,28 +48,46 @@ rule rename_assembly:
     input:
         original = rules.rnaspades.output.fasta
     output:
-        renamed = RNASPADES_OUT_DIR / '{sample}_rnaspades/{sample}_transcripts.fasta'
+        renamed = Path(config['outdir']) / '{sample}/rnaspades/{sample}_transcripts.fasta'
     run:
-        os.rename(input.original, output.renamed)
+        shutil.copy(input.original, output.renamed)
 
-rule transdecoder:
+rule rename_headers:
     input:
         fasta = rules.rename_assembly.output.renamed
     output:
-        outdir = directory(TRANSDECODER_OUT_DIR / '{sample}_transdecoder'),
-        longest_orfs = (TRANSDECODER_OUT_DIR / '{sample}_transdecoder') / 'longest_orfs.cds',
-        longest_orfs_gff3 = (TRANSDECODER_OUT_DIR / '{sample}_transdecoder') / 'longest_orfs.gff3',
-        longest_orfs_pep = (TRANSDECODER_OUT_DIR / '{sample}_transdecoder') / 'longest_orfs.pep',
+        fasta = Path(config['outdir']) / '{sample}/rnaspades/{sample}_transcripts_renamed.fasta'
+    shell:
+        "python scripts/seqhash_rename.py --input {input.fasta} --output {output.fasta}"
+
+rule transdecoder:
+    input:
+        fasta = rules.rename_headers.output.fasta
+    output:
+        outdir = directory(Path(config['outdir']) / '{sample}/transdecoder'),
+        longest_orfs_cds = (Path(config['outdir']) / '{sample}/transdecoder') / '{sample}.cds',
+        longest_orfs_gff3 = (Path(config['outdir']) / '{sample}/transdecoder') / '{sample}.gff3',
+        longest_orfs_pep = (Path(config['outdir']) / '{sample}/transdecoder') / '{sample}.pep',
+        longest_orfs_bed = (Path(config['outdir']) / '{sample}/transdecoder') / '{sample}.bed',
     run:
         shell(
             """
-            TransDecoder.LongOrfs -t {input.fasta} -O {output.outdir}
+            TransDecoder.LongOrfs -t {input.fasta} --output_dir {output.outdir} --complete_orfs_only
             """
         )
 
         shell(
             """
-            TransDecoder.Predict -t {input.fasta} --no_refine_starts -O {output.outdir}
+            TransDecoder.Predict -t {input.fasta} --no_refine_starts --output_dir {output.outdir}
+            """
+        )
+
+        shell(
+            """
+            mv {wildcards.sample}_transcripts_renamed.fasta.transdecoder.bed {output.longest_orfs_bed}
+            mv {wildcards.sample}_transcripts_renamed.fasta.transdecoder.cds {output.longest_orfs_cds}
+            mv {wildcards.sample}_transcripts_renamed.fasta.transdecoder.gff3 {output.longest_orfs_gff3}
+            mv {wildcards.sample}_transcripts_renamed.fasta.transdecoder.pep {output.longest_orfs_pep}
             """
         )
 

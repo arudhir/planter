@@ -1,11 +1,9 @@
-ILMN_READ_DIR = Path(config['outdir']) / 'illumina'
-
 rule download_reads:
     output:
-        r1 = ILMN_READ_DIR / "raw/{sample}_1.fastq",
-        r2 = ILMN_READ_DIR / "raw/{sample}_2.fastq"
+        r1 = Path(config['outdir']) / '{sample}/illumina/raw/{sample}_1.fastq',
+        r2 = Path(config['outdir']) / '{sample}/illumina/raw/{sample}_2.fastq'
     params:
-        outdir = ILMN_READ_DIR / 'raw'
+        outdir = lambda wildcards: Path(config['outdir']) / f'{wildcards.sample}/illumina/raw'
     run:
         shell(
             """
@@ -18,8 +16,8 @@ rule compress_reads:
         r1 = rules.download_reads.output.r1,
         r2 = rules.download_reads.output.r2
     output:
-        r1 = ILMN_READ_DIR / "raw/{sample}_1.fastq.gz",
-        r2 = ILMN_READ_DIR / "raw/{sample}_2.fastq.gz"
+        r1 = Path(config['outdir']) / "{sample}/illumina/raw/{sample}_1.fastq.gz",
+        r2 = Path(config['outdir']) / "{sample}/illumina/raw/{sample}_2.fastq.gz"
     run:
         shell(
             """
@@ -34,10 +32,10 @@ rule fastp_raw:
         r1 = rules.compress_reads.output.r1,
         r2 = rules.compress_reads.output.r2
     output:
-        r1 = (ILMN_READ_DIR / 'fastp_raw/{sample}.1.fq.gz'),
-        r2 = (ILMN_READ_DIR / 'fastp_raw/{sample}.2.fq.gz'),
-        json = (ILMN_READ_DIR / 'fastp_raw/{sample}_fastp.json'),
-        html = (ILMN_READ_DIR / 'fastp_raw/{sample}_fastp.html')
+        r1 = Path(config['outdir']) / "{sample}/illumina/fastp_raw/{sample}.1.fq.gz",
+        r2 = Path(config['outdir']) / "{sample}/illumina/fastp_raw/{sample}.2.fq.gz",
+        json = Path(config['outdir']) / "{sample}/illumina/fastp_raw/{sample}_fastp.json",
+        html = Path(config['outdir']) / "{sample}/illumina/fastp_raw/{sample}_fastp.html"
     threads: workflow.cores
     run:
         shell(
@@ -56,11 +54,11 @@ rule filter_rrna:
         r1 = rules.fastp_raw.output.r1,
         r2 = rules.fastp_raw.output.r2
     output:
-        r1 = ILMN_READ_DIR / 'rrna_filtered/{sample}.1.fq.gz',
-        r2 = ILMN_READ_DIR / 'rrna_filtered/{sample}.2.fq.gz',
-        stats = ILMN_READ_DIR / 'rrna_filtered/{sample}_rRNA_filter.stats'
+        r1 = Path(config['outdir']) / "{sample}/illumina/rrna_filtered/{sample}.1.fq.gz",
+        r2 = Path(config['outdir']) / "{sample}/illumina/rrna_filtered/{sample}.2.fq.gz",
+        stats = Path(config['outdir']) / "{sample}/illumina/rrna_filtered/{sample}_rRNA_filter.stats"
     log: 
-        ILMN_READ_DIR / 'rrna_filtered/{sample}_rRNA_filter.log'
+        Path(config['outdir']) / "{sample}/illumina/rrna_filtered/{sample}_rRNA_filter.log"
     threads: workflow.cores * 0.25
     run:
         shell(
@@ -103,8 +101,8 @@ rule normalize:
         r1 = rules.filter_rrna.output.r1,
         r2 = rules.filter_rrna.output.r2
     output:
-        r1 = ILMN_READ_DIR / 'normalized/{sample}_normalized.1.fq.gz',
-        r2 = ILMN_READ_DIR / 'normalized/{sample}_normalized.2.fq.gz'
+        r1 = Path(config['outdir']) / "{sample}/illumina/normalized/{sample}_normalized.1.fq.gz",
+        r2 = Path(config['outdir']) / "{sample}/illumina/normalized/{sample}_normalized.2.fq.gz"
     params:
         memory = '20g'
     threads: workflow.cores / 2
@@ -127,10 +125,10 @@ rule fastp_processed:
         r1 = rules.normalize.output.r1,
         r2 = rules.normalize.output.r2
     output:
-        r1 = (ILMN_READ_DIR / 'processed/{sample}.1.fq.gz'),
-        r2 = (ILMN_READ_DIR / 'processed/{sample}.2.fq.gz'),
-        json = (ILMN_READ_DIR / 'processed/{sample}_fastp.json'),
-        html = (ILMN_READ_DIR / 'processed/{sample}_fastp.html')
+        r1 = (Path(config['outdir']) / "{sample}/illumina/processed/{sample}.1.fq.gz"),
+        r2 = (Path(config['outdir']) / "{sample}/illumina/processed/{sample}.2.fq.gz"),
+        json = (Path(config['outdir']) / "{sample}/illumina/processed/{sample}_fastp.json"),
+        html = (Path(config['outdir']) / "{sample}/illumina/processed/{sample}_fastp.html")
     threads: workflow.cores
     run:
         shell(
