@@ -2,12 +2,12 @@ version: '2'
 services:
   pteryx:
     build: .
-    image: pteryx
+    image: planter
     stdin_open: True
     tty: True
     volumes:
-      - ./pteryx/workflow:/pteryx/workflow
-      - ./tests:/usr/src/pteryx/tests
-      - ./tests/fixtures/mesoplasma:/pteryx/inputs
-      - ./outputs:/pteryx/outputs
-      - .:/usr/src/pteryx
+      - ./pteryx/workflow:/planter/workflow
+      - ./tests:/usr/src/planter/tests
+      - ./tests/fixtures/mesoplasma:/planter/inputs
+      - /mnt/data/planter_outputs:/planter/outputs
+      - .:/usr/src/planter
