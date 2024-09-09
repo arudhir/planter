@@ -1,9 +1,19 @@
-# planter
+# planter: work in progress
 
+# vision
 ![full](images/planter.png "planter")
+
+# snakemake dag
 ![dag](images/dag.png "dag")
 
+we want to assemble and annotate transcripts
 
+# quickstart
+
+```console
+make image
+docker-compose run --rm planter snakemake --cores 16  # Runs the Snakefile in the container
+```
 
 # Test Samples
 

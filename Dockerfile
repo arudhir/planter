@@ -125,22 +125,22 @@ RUN wget https://ftp.ncbi.nlm.nih.gov/asn1-converters/by_program/table2asn/linux
 ##############
 ### Prokka ###
 ##############
-RUN wget -O prokka-v1.14.tar.gz https://github.com/tseemann/prokka/archive/v1.14.0.tar.gz \
-    && tar -xzvf prokka-v1.14.tar.gz
+# RUN wget -O prokka-v1.14.tar.gz https://github.com/tseemann/prokka/archive/v1.14.0.tar.gz \
+#     && tar -xzvf prokka-v1.14.tar.gz
 
 ##############
 #### Canu ####
 ##############
-RUN wget https://github.com/marbl/canu/releases/download/v1.8/canu-1.8.Linux-amd64.tar.xz \
-    && xz -dc canu-1.8.*.tar.xz | tar -xf -
+# RUN wget https://github.com/marbl/canu/releases/download/v1.8/canu-1.8.Linux-amd64.tar.xz \
+#     && xz -dc canu-1.8.*.tar.xz | tar -xf -
 
 ##############
 #### Flye ####
 ##############
-RUN git clone https://github.com/fenderglass/Flye \
-    && cd Flye \
-    && python3 setup.py build \
-    && python3 setup.py install
+# RUN git clone https://github.com/fenderglass/Flye \
+#     && cd Flye \
+#     && python3 setup.py build \
+#     && python3 setup.py install
 
 #################
 #### Filtlong ###
@@ -182,8 +182,8 @@ RUN git clone https://github.com/fenderglass/Flye \
 ##################
 ##### Bowtie2 ####
 ##################
-RUN wget https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.3.2/bowtie2-2.3.2-linux-x86_64.zip \
-    && unzip bowtie2-2.3.2-linux-x86_64.zip
+# RUN wget https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.3.2/bowtie2-2.3.2-linux-x86_64.zip \
+#     && unzip bowtie2-2.3.2-linux-x86_64.zip
 
 ##################
 ##### Porechop ###
@@ -253,16 +253,16 @@ RUN wget https://sourceforge.net/projects/bowtie-bio/files/bowtie2/2.3.2/bowtie2
 ##################
 #### minigraph ###
 ##################
-RUN git clone https://github.com/lh3/minigraph \
-    && cd minigraph && make
+# RUN git clone https://github.com/lh3/minigraph \
+#     && cd minigraph && make
 
 ##################
 ##### Miniasm ####
 ##################
-WORKDIR $TOOLS
-RUN git clone https://github.com/lh3/miniasm  \
-    && cd miniasm  \
-    && make
+# WORKDIR $TOOLS
+# RUN git clone https://github.com/lh3/miniasm  \
+#     && cd miniasm  \
+#     && make
 
 ##################
 ##### MUMmer #####
@@ -283,10 +283,10 @@ RUN git clone https://github.com/lh3/miniasm  \
 ################
 #### SKESA #####
 ################
-WORKDIR ${TOOLS}
-RUN git clone https://github.com/ncbi/SKESA \
-    && cd SKESA \
-    && make -f Makefile.nongs
+# WORKDIR ${TOOLS}
+# RUN git clone https://github.com/ncbi/SKESA \
+#     && cd SKESA \
+#     && make -f Makefile.nongs
 
 ################
 #### DIAMOND ###
@@ -404,7 +404,7 @@ ENV MERQURY=${TOOLS}/merqury-1.3
 #RUN prokka-1.14.0/bin/prokka --setupdb
 
 ### Set PATH and do some extraneous steps
-ENV PATH=/:/usr/src/pteryx/pteryx:/tools/ntHits-ntHits-v0.0.1/:/tools/minimap2:/tools/racon/build/bin:/tools/ntEdit/:/tools/racon-v1.3.1/build/bin:/tools/augustus-3.3.2/bin:/tools/augustus-3.3.2/bin/scripts:/tools/ncbi-blast-2.9.0+/bin:/tools/Flye/bin:/tools/prokka-1.14.0/bin/:/tools/barrnap-0.8/bin:/tools/bbmap:/tools/bowtie2-2.3.2/:/tools/SPAdes-4.0.0-Linux/bin:/tools/Filtlong/bin:/tools/canu-1.8/Linux-amd64/bin:/tools:/usr/bin:/tools/SKESA:/tools/miniasm/:/tools/seqtk:/tools/quast-5.0.2:/tools/minigraph:/tools/SPAdes-3.13.0-Linux/bin:$PATH:/tools/mmseqs/bin/:$PATH
+ENV PATH=/:/usr/src/planter/planter:/tools/ntHits-ntHits-v0.0.1/:/tools/minimap2:/tools/racon/build/bin:/tools/ntEdit/:/tools/racon-v1.3.1/build/bin:/tools/augustus-3.3.2/bin:/tools/augustus-3.3.2/bin/scripts:/tools/ncbi-blast-2.9.0+/bin:/tools/Flye/bin:/tools/prokka-1.14.0/bin/:/tools/barrnap-0.8/bin:/tools/bbmap:/tools/bowtie2-2.3.2/:/tools/SPAdes-4.0.0-Linux/bin:/tools/Filtlong/bin:/tools/canu-1.8/Linux-amd64/bin:/tools:/usr/bin:/tools/SKESA:/tools/miniasm/:/tools/seqtk:/tools/quast-5.0.2:/tools/minigraph:/tools/SPAdes-3.13.0-Linux/bin:$PATH:/tools/mmseqs/bin/:$PATH
 
 #RUN rm ${TOOLS}/*.gz && \
     #rm ${TOOLS}/*.zip
@@ -412,15 +412,15 @@ ENV PATH=/:/usr/src/pteryx/pteryx:/tools/ntHits-ntHits-v0.0.1/:/tools/minimap2:/
 #################################################################################
 # Workflow and homemade scripts
 # Set up the working directory
-ENV APP_HOME=/usr/src/pteryx
+ENV APP_HOME=/usr/src/planter
 RUN mkdir -p $APP_HOME
 WORKDIR $APP_HOME
 
 # Copy necessary files
-COPY setup.py setup.py
-COPY pteryx pteryx
-COPY setup.cfg setup.cfg
-
+#COPY setup.py setup.py
+#COPY planter planter
+#COPY setup.cfg setup.cfg
+COPY workflow workflow
 # Install build tool using pip (not uv) to ensure it's in the system Python path
 RUN pip install build --break-system-packages
 
@@ -431,17 +431,17 @@ RUN uv pip install build
 ENV PATH="/root/.local/bin:${PATH}"
 
 # Build the package
-RUN python3 -m build
+#RUN python3 -m build
 
 # Install the built package
-RUN uv pip install dist/*.whl
+#RUN uv pip install dist/*.whl
 
 # Set Python path
-ENV PYTHONPATH=${PYTHONPATH}:/usr/src/pteryx
+#ENV PYTHONPATH=${PYTHONPATH}:/usr/src/planter
 
 
 # Set up application home
-#ENV APP_HOME=/pteryx
+#ENV APP_HOME=/planter
 #RUN mkdir -p $APP_HOME
 #WORKDIR $APP_HOME
 
