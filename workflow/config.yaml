@@ -5,8 +5,8 @@ trimmomatic_parameters: "ILLUMINACLIP:adapters.fasta:2:30:10 SLIDINGWINDOW:4:5 L
 s3_bucket: "recombia.planter"
 samples:
   - SRR12068547
-  #- SRR8053131
-  #- SRR29142729
-  #- SRR22420515
-  #- SRR5936537
+  - SRR8053131
+  - SRR29142729
+  # - SRR22420515
+  - SRR5936537
   # - SRR2103848

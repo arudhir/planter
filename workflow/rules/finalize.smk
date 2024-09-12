@@ -25,9 +25,10 @@ def upload_to_s3(zip_archive):
 
 rule finalize:
     input:
+        eggnog = expand(rules.eggnog.output, sample=config['samples']),
         output_dirs = expand(Path(config['outdir']) / '{sample}', sample=config['samples'])
     output:
-        zip_archive = Path(config['outdir']) / '{sample}.zip',
+        zip_archive = expand(Path(config['outdir']) / '{sample}.zip', sample=config['samples']),
     run:
         for output_dir in input.output_dirs:
             zip_archive = create_zip_archive(output_dir)
