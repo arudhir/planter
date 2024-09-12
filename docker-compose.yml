@@ -9,5 +9,5 @@ services:
       - ./planter/workflow:/planter/workflow
       - ./tests:/usr/src/planter/tests
       - ./tests/fixtures/mesoplasma:/planter/inputs
-      - /mnt/data/planter_outputs:/planter/outputs
+      - /mnt/data/planter_outputs:/usr/src/planter/outputs
       - .:/usr/src/planter

@@ -3,9 +3,9 @@ bbduk_parameters: "k=31 -Xmx5g"
 rrna_db: "references/combined_rrna_ref.fasta"
 trimmomatic_parameters: "ILLUMINACLIP:adapters.fasta:2:30:10 SLIDINGWINDOW:4:5 LEADING:5 TRAILING:5 MINLEN:25"
 samples:
-  - SRR12068547
-  - SRR8053131
-  - SRR29142729
-  - SRR22420515
-  - SRR5936537
-  #- SRR2103848
+  #- SRR12068547
+  #- SRR8053131
+  #- SRR29142729
+  #- SRR22420515
+  #- SRR5936537
+  - SRR2103848
