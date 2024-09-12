@@ -5,6 +5,7 @@ outdir = config['outdir']
 include: 'rules/reads.smk'
 include: 'rules/assembly.smk'
 include: 'rules/annotate.smk'
+include: 'rules/finalize.smk'
 
 samples = config['samples']
 
@@ -16,4 +17,4 @@ rule all:
         expand(rules.rnaspades.output, sample=samples),
         # expand(rules.transdecoder.output, sample=samples),
         expand(rules.eggnog.output, sample=samples),
-        rules.finalize.output,
+        expand(rules.finalize.output, sample=samples),
