@@ -30,7 +30,7 @@ $ jq < output/SRR8053131/SRR8053131_stats.json
   "Total Assembly Length": 110773877,
   "N50": 1372,
   "ExN50": 980,
-  "Average Expression (TPM)": 7.888488329431161
+  "Average Expression (TPM)": 7.89
 }
 ```
 
