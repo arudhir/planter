@@ -19,8 +19,10 @@ docker-compose run --rm planter snakemake --cores 16  # Runs the Snakefile in th
 
 - [ ] Write script that finalizes the output metadata
     - [ ] Number of reads
+    - [ ] Number of rRNA reads
     - [ ] Number of contigs
-    - [ ] Number of genes
+    - [ ] Number of TransDecoder predicted ORFs
+    - [ ] Number of TransDecoder predicted proteins
     - [ ] Number of EggNOG Orthologs
     - [ ] Distribution of COG annotations
     - [ ] Percentage of reads mapped to the SPAdes transcripts
