@@ -36,7 +36,8 @@ RUN apt-get update && apt-get install -y \
     python3-venv \
     progressivemauve \
     fastqc \
-    wget
+    wget \
+    salmon
 
 # TODO: Move to uv Install uv
 #RUN curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -428,30 +429,6 @@ WORKDIR $APP_HOME
 #COPY planter planter
 #COPY setup.cfg setup.cfg
 COPY workflow workflow
-# Install build tool using pip (not uv) to ensure it's in the system Python path
-RUN pip install build --break-system-packages
 
-# Install build tool
-RUN uv pip install build
-
-# Ensure uv-installed binaries are in PATH
-ENV PATH="/root/.local/bin:${PATH}"
-
-# Build the package
-#RUN python3 -m build
-
-# Install the built package
-#RUN uv pip install dist/*.whl
-
-# Set Python path
-#ENV PYTHONPATH=${PYTHONPATH}:/usr/src/planter
-
-
-# Set up application home
-#ENV APP_HOME=/planter
-#RUN mkdir -p $APP_HOME
-#WORKDIR $APP_HOME
-
-# Create input and output directories
 RUN mkdir -p $APP_HOME/inputs $APP_HOME/outputs
 

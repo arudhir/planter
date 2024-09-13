@@ -13,6 +13,7 @@ def create_zip_archive(output_dir):
     )
     return zip_archive
 
+
 def upload_to_s3(zip_archive):
     s3 = boto3.client('s3')
     zip_filename = os.path.basename(zip_archive)  # only the filename, no local path
@@ -23,13 +24,18 @@ def upload_to_s3(zip_archive):
     except Exception as e:
         print(f"Failed to upload {zip_filename}: {e}")
 
+
+
 rule finalize:
     input:
         eggnog = expand(rules.eggnog.output, sample=config['samples']),
-        output_dirs = expand(Path(config['outdir']) / '{sample}', sample=config['samples'])
+        quant = expand(rules.quant.output, sample=config['samples']),
     output:
         zip_archive = expand(Path(config['outdir']) / '{sample}.zip', sample=config['samples']),
     run:
-        for output_dir in input.output_dirs:
+        # import ipdb; ipdb.set_trace()
+        for sample in config['samples']:
+            print('Finalizing sample: ', sample)
+            output_dir = Path(config['outdir']) / sample
             zip_archive = create_zip_archive(output_dir)
             upload_to_s3(zip_archive)
