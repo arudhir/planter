@@ -15,6 +15,28 @@ make image
 docker-compose run --rm planter snakemake --cores 16  # Runs the Snakefile in the container
 ```
 
+You can get a quick summary the pipeline's outputs:
+```console
+$ jq < output/SRR8053131/SRR8053131_stats.json
+{
+  "Number of Orthologs": 42707,
+  "Number of Secondary Metabolite Genes": 945,
+  "Percent Mapped": 88.21,
+  "Number of Reads Mapped": 79206071.0,
+  "Total Reads (Before)": 182858938,
+  "Total Reads (After)": 180926144,
+  "Sequencing Type": "paired end (50 cycles + 50 cycles)",
+  "Number of Transcripts": 126768,
+  "Total Assembly Length": 110773877,
+  "N50": 1372,
+  "ExN50": 980,
+  "Average Expression (TPM)": 7.888488329431161
+}
+```
+
+We see SRR8053131 has 42,707 orthologs and 945 secondary metabolite genes.
+
+
 # TODO
 
 - [ ] Write script that finalizes the output metadata
