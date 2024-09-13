@@ -26,6 +26,28 @@ def upload_to_s3(zip_archive):
 
 
 
+rule get_qc_stats:
+    input:
+        fastp = rules.fastp_raw.output.json,
+        salmon_metadata = rules.quant.output.stats,
+        quantsf = rules.quant.output.formatted_tsv,
+        transcripts = rules.rename_headers.output.fasta,
+        eggnog = rules.eggnog.output.annotations,
+    output:
+        qc_stats = Path(config['outdir']) / '{sample}/{sample}_stats.json',
+    threads: workflow.cores        
+    run:
+        shell(
+            'scripts/get_qc_stats.py '
+            '--fastp {input.fastp} '
+            '--salmon_metadata {input.salmon_metadata} '
+            '--transcripts {input.transcripts} '
+            '--quantsf {input.quantsf} '
+            '--eggnog {input.eggnog} '
+            '--output_file {output.qc_stats}'
+        )
+
+
 rule finalize:
     input:
         analyze_eggnog = expand(rules.analyze_eggnog.output, sample=config['samples']),

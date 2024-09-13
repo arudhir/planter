@@ -28,6 +28,7 @@ docker-compose run --rm planter snakemake --cores 16  # Runs the Snakefile in th
     - [ ] Percentage of reads mapped to the SPAdes transcripts
 - [ ] Create database of transcripts
     - [ ] Generate clustered representative transcripts
+- [ ] Create Flask app to serve the homology search
 
 # Test Samples
 
