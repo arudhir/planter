@@ -28,12 +28,11 @@ def upload_to_s3(zip_archive):
 
 rule finalize:
     input:
-        eggnog = expand(rules.eggnog.output, sample=config['samples']),
+        analyze_eggnog = expand(rules.analyze_eggnog.output, sample=config['samples']),
         quant = expand(rules.quant.output, sample=config['samples']),
     output:
         zip_archive = expand(Path(config['outdir']) / '{sample}.zip', sample=config['samples']),
     run:
-        # import ipdb; ipdb.set_trace()
         for sample in config['samples']:
             print('Finalizing sample: ', sample)
             output_dir = Path(config['outdir']) / sample

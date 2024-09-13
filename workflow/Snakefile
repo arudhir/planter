@@ -18,6 +18,7 @@ rule all:
         expand(rules.rnaspades.output, sample=samples),
         # expand(rules.transdecoder.output, sample=samples),
         expand(rules.eggnog.output, sample=samples),
+        expand(rules.analyze_eggnog.output, sample=samples),
         expand(rules.quant.output, sample=samples),
         expand(rules.finalize.output, sample=samples),
         

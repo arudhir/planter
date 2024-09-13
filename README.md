@@ -15,6 +15,18 @@ make image
 docker-compose run --rm planter snakemake --cores 16  # Runs the Snakefile in the container
 ```
 
+# TODO
+
+- [ ] Write script that finalizes the output metadata
+    - [ ] Number of reads
+    - [ ] Number of contigs
+    - [ ] Number of genes
+    - [ ] Number of EggNOG Orthologs
+    - [ ] Distribution of COG annotations
+    - [ ] Percentage of reads mapped to the SPAdes transcripts
+- [ ] Create database of transcripts
+    - [ ] Generate clustered representative transcripts
+
 # Test Samples
 
 SRR5936537: https://www.ncbi.nlm.nih.gov/sra/?term=SRR5936537

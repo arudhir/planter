@@ -11,3 +11,4 @@ services:
       - ./tests/fixtures/mesoplasma:/usr/src/planter/inputs
       - /mnt/data/planter_outputs:/usr/src/planter/outputs
       - .:/usr/src/planter
+      - /mnt/data:/mnt/data
