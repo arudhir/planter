@@ -10,4 +10,9 @@ samples:
   # - SRR22420515  # Passiflora edulis; single end
   - SRR5936537   # Rhodiola rosea
   # - SRR2103848   # Photinus pyralis (firefly)
+  - SRR28059381	 # Gyrinops: day28-2
+  - SRR28059382  # Gyrinops: day28-1
+  - SRR28059383	 # Gyrinops: day2-2
+  - SRR28059384  # Gyrinops: day2-1
+  - SRR28059385  # Gyrinops: control-2
   - SRR28059386  # Gyrinops; agarwood, control-1
