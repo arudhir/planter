@@ -1,21 +1,21 @@
-outdir: "/mnt/data/planter_outputs"
+outdir: "/mnt/data2/planter_outputs"
 bbduk_parameters: "k=31 -Xmx5g"
 rrna_db: "references/combined_rrna_ref.fasta"
 trimmomatic_parameters: "ILLUMINACLIP:adapters.fasta:2:30:10 SLIDINGWINDOW:4:5 LEADING:5 TRAILING:5 MINLEN:25"
 s3_bucket: "recombia.planter"
 samples:
-  - SRR12068547  # M. florum 
-  - SRR8053131   # Piper methysticum
-  - SRR29142729  # Gerbera hybrid cultivar
-  # - SRR22420515  # Passiflora edulis; single end
-  - SRR5936537   # Rhodiola rosea
-  # - SRR2103848   # Photinus pyralis (firefly)
-  - SRR28059381     # Gyrinops: day28-2
-  - SRR28059382  # Gyrinops: day28-1
-  - SRR28059383     # Gyrinops: day2-2
-  - SRR28059384  # Gyrinops: day2-1
-  - SRR28059385  # Gyrinops: control-2
-  - SRR28059386  # Gyrinops; agarwood, control-1
+  #- SRR12068547  # M. florum 
+  #- SRR8053131   # Piper methysticum
+  #- SRR29142729  # Gerbera hybrid cultivar
+  ## - SRR22420515  # Passiflora edulis; single end
+  #- SRR5936537   # Rhodiola rosea
+  ## - SRR2103848   # Photinus pyralis (firefly)
+  #- SRR28059381     # Gyrinops: day28-2
+  #- SRR28059382  # Gyrinops: day28-1
+  #- SRR28059383     # Gyrinops: day2-2
+  #- SRR28059384  # Gyrinops: day2-1
+  #- SRR28059385  # Gyrinops: control-2
+  #- SRR28059386  # Gyrinops; agarwood, control-1
   - SRR22904707  # Xanthoria elegans (lichen)
   - SRR14292007  # Cladonia macilenta (biruloquinone-producing lichen; purple strain); https://www.mdpi.com/2309-608X/7/5/398
   - SRR14292008     # Cladonia macilenta (biruloquinone-producing lichen; normal strain)
