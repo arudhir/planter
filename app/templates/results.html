@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MMSeqs2 Search Results</title>
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.24/css/jquery.dataTables.css">
+    <!-- jQuery -->
+    <script type="text/javascript" charset="utf8" src="https://code.jquery.com/jquery-3.5.1.js"></script>
+    <!-- DataTables JS -->
+    <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        h1 { color: #333; }
+        #resultsTable { width: 100%; border-collapse: collapse; }
+        #resultsTable th, #resultsTable td { padding: 8px; border: 1px solid #ddd; }
+        #resultsTable th { background-color: #f2f2f2; cursor: pointer; }
+        #resultsTable tr:nth-child(even) { background-color: #f9f9f9; }
+        #resultsTable tr:hover { background-color: #f5f5f5; }
+    </style>
+</head>
+<body>
+    <h1>MMSeqs2 Search Results</h1>
+    {% if results.data %}
+        <table id="resultsTable">
+            <thead>
+                <tr>
+                    {% for header in results.headers %}
+                        <th>{{ header }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in results.data %}
+                    <tr>
+                        {% for header in results.headers %}
+                            <td>{{ row[header] }}</td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No results found.</p>
+    {% endif %}
+
+    <script type="text/javascript">
+        $(document).ready(function() {
+            $('#resultsTable').DataTable({
+                "pageLength": 25, // Show 25 entries per page
+                "order": [[10, "asc"]], // Sort by E-value (11th column) ascending by default
+                "columnDefs": [
+                    { "type": "scientific", "targets": 10 } // Use scientific sort for E-value column
+                ]
+            });
+        });
+    </script>
+</body>
+</html>
