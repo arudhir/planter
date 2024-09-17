@@ -18,4 +18,4 @@ samples:
   - SRR28059386  # Gyrinops; agarwood, control-1
   - SRR22904707  # Xanthoria elegans (lichen)
   - SRR14292007  # Cladonia macilenta (biruloquinone-producing lichen; purple strain); https://www.mdpi.com/2309-608X/7/5/398
-  - SRR14292008	 # Cladonia macilenta (biruloquinone-producing lichen; normal strain)
+  - SRR14292008     # Cladonia macilenta (biruloquinone-producing lichen; normal strain)
