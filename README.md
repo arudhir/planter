@@ -101,3 +101,9 @@ SRR22420515: Genbank BBI55602.1|BBI55602.1|
 # NOTE
 
 SRR12068547 is Mesoplasma. JC got it!
+
+# TODO
+
+1. Work out how to get the other members of a cluster
+2. Get the eggNOG annotations as part of the search output
+3. Attach the metadata for the SRA ID for the seqhash hit
