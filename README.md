@@ -48,7 +48,7 @@ Example output structure:
     ├── SRR12068547.cds
     ├── SRR12068547.gff3
     ├── SRR12068547.pep                                 # Predicted proteins; used for eggNOG
-`
+```
 # Workflow
 
 ## Read Processing
