@@ -46,7 +46,7 @@ Fast compression to `*.fastq.gz`
 
 ### 3. Preprocess the reads with `fastp`
 
-`fastp`![https://github.com/OpenGene/fastp] is an all-in-one read preprocessing tool. It does adapter trimming, quality filtering, and gets quality statistics.
+[`fastp`](https://github.com/OpenGene/fastp) is an all-in-one read preprocessing tool. It does adapter trimming, quality filtering, and gets quality statistics.
 
 ### 4. Filter rRNA reads with `bbduk`
 
