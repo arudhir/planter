@@ -104,7 +104,7 @@ rule normalize:
         r1 = Path(config['outdir']) / "{sample}/illumina/normalized/{sample}_normalized.1.fq.gz",
         r2 = Path(config['outdir']) / "{sample}/illumina/normalized/{sample}_normalized.2.fq.gz"
     params:
-        memory = '20g'
+        memory = '10g'
     threads: workflow.cores / 2
     run:
         shell(
