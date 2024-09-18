@@ -1,5 +1,5 @@
 outputs/*
 tests/test-output
 references/*
-.snakemake
+.snakemake/*
 __pycache__
