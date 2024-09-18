@@ -24,7 +24,7 @@ $ docker-compose run --rm planter \
 
 `workflow/rules/reads.smk`
 
-1. Download the reads using `fastq-dump`
+### 1. Download the reads using `fastq-dump`
 
 **n.b** The SRA experiment needs to be paired end. There is a command-line utility in `scripts/get_srr_metadata.py` that will get the metadata for SRA IDs:
 
@@ -40,23 +40,23 @@ options:
   --srr SRR [SRR ...]  One or more SRR IDs to look up
 ```
 
-2. Compress the reads with `pigz`
+### 2. Compress the reads with `pigz`
 
-3. Preprocess the reads with `fastp`
+### 3. Preprocess the reads with `fastp`
 
 `fastp`[https://github.com/OpenGene/fastp] is an all-in-one read preprocessing tool. It does adapter trimming, quality filtering, and gets quality statistics.
 
-4. Filter rRNA reads with `bbduk`
+### 4. Filter rRNA reads with `bbduk`
 
 The rRNA sequences are obtained from the SILVA database [https://www.arb-silva.de/download/arb-files/]. We remove reads that come from rRNA.
 
-5. Normalize read coverage with `bbnorm`
+### 5. Normalize read coverage with `bbnorm`
 
 We even out the read coverage to make assembly more efficient.
 
 **n.b.** This normalization is done for assembly, not for read quantification, where we would of course want to retain uneven coverage.
 
-6. Get final read statistics with `fastp`
+### 6. Get final read statistics with `fastp`
 
 Just a sanity check.
 
