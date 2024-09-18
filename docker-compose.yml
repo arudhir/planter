@@ -5,6 +5,8 @@ services:
     image: planter
     stdin_open: True
     tty: True
+    environment:
+      - TMPDIR=/mnt/data2/tmp
     volumes:
       - ./planter/workflow:/planter/workflow
       - ./tests:/usr/src/planter/tests
