@@ -50,7 +50,7 @@ Fast compression to `*.fastq.gz`
 
 ### 4. Filter rRNA reads with `bbduk`
 
-The rRNA sequences are obtained from the [SILVA database] (https://www.arb-silva.de/download/arb-files/). We remove reads that come from rRNA.
+The rRNA sequences are obtained from the (SILVA database)[https://www.arb-silva.de/download/arb-files/]. We remove reads that come from rRNA.
 
 ### 5. Normalize read coverage with `bbnorm`
 
