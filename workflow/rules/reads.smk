@@ -1,7 +1,7 @@
 rule download_reads:
     output:
-        r1 = Path(config['outdir']) / '{sample}/illumina/raw/{sample}_1.fastq',
-        r2 = Path(config['outdir']) / '{sample}/illumina/raw/{sample}_2.fastq'
+        r1 = temp(Path(config['outdir']) / '{sample}/illumina/raw/{sample}_1.fastq'),
+        r2 = temp(Path(config['outdir']) / '{sample}/illumina/raw/{sample}_2.fastq')
     params:
         outdir = lambda wildcards: Path(config['outdir']) / f'{wildcards.sample}/illumina/raw'
     run:
@@ -16,8 +16,8 @@ rule compress_reads:
         r1 = rules.download_reads.output.r1,
         r2 = rules.download_reads.output.r2
     output:
-        r1 = Path(config['outdir']) / "{sample}/illumina/raw/{sample}_1.fastq.gz",
-        r2 = Path(config['outdir']) / "{sample}/illumina/raw/{sample}_2.fastq.gz"
+        r1 = temp(Path(config['outdir']) / "{sample}/illumina/raw/{sample}_1.fastq.gz"),
+        r2 = temp(Path(config['outdir']) / "{sample}/illumina/raw/{sample}_2.fastq.gz")
     run:
         shell(
             """
@@ -32,8 +32,8 @@ rule fastp_raw:
         r1 = rules.compress_reads.output.r1,
         r2 = rules.compress_reads.output.r2
     output:
-        r1 = Path(config['outdir']) / "{sample}/illumina/fastp_raw/{sample}.1.fq.gz",
-        r2 = Path(config['outdir']) / "{sample}/illumina/fastp_raw/{sample}.2.fq.gz",
+        r1 = temp(Path(config['outdir']) / "{sample}/illumina/fastp_raw/{sample}.1.fq.gz"),
+        r2 = temp(Path(config['outdir']) / "{sample}/illumina/fastp_raw/{sample}.2.fq.gz"),
         json = Path(config['outdir']) / "{sample}/illumina/fastp_raw/{sample}_fastp.json",
         html = Path(config['outdir']) / "{sample}/illumina/fastp_raw/{sample}_fastp.html"
     threads: workflow.cores
@@ -98,8 +98,8 @@ rule filter_rrna:
 
 rule normalize:
     input:
-        r1 = rules.filter_rrna.output.r1,
-        r2 = rules.filter_rrna.output.r2
+        r1 = temp(rules.filter_rrna.output.r1),
+        r2 = temp(rules.filter_rrna.output.r2)
     output:
         r1 = Path(config['outdir']) / "{sample}/illumina/normalized/{sample}_normalized.1.fq.gz",
         r2 = Path(config['outdir']) / "{sample}/illumina/normalized/{sample}_normalized.2.fq.gz"
