@@ -55,7 +55,10 @@ rule finalize:
     output:
         zip_archive = expand(Path(config['outdir']) / '{sample}.zip', sample=config['samples']),
     run:
-        for sample in config['samples']:
+        samples = config['samples']
+        if type(config['samples']) != list:
+            samples = [config['samples']]
+        for sample in samples:
             print('Finalizing sample: ', sample)
             output_dir = Path(config['outdir']) / sample
             zip_archive = create_zip_archive(output_dir)

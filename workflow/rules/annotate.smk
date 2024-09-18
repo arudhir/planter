@@ -11,7 +11,7 @@ rule eggnog:
         eggnog_outdir = directory(Path(config['outdir']) / '{sample}/eggnog'),
     run:
         shell(
-            '/opt/eggnog-mapper/emapper.py '
+            'source $VIRTUAL_ENV/bin/activate && /tools/eggnog-mapper/emapper.py '
             '-i {input.transcriptome} '
             '--itype proteins '
             '--output {wildcards.sample} '

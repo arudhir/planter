@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/opt/venv/bin/python
 import argparse
 import pandas as pd
 import matplotlib.pyplot as plt

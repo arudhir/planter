@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/opt/venv/bin/python
 import argparse
 from pathlib import Path
 from Bio import SeqIO

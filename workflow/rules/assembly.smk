@@ -58,7 +58,7 @@ rule rename_headers:
     output:
         fasta = Path(config['outdir']) / '{sample}/rnaspades/{sample}_transcripts_renamed.fasta'
     shell:
-        "python scripts/seqhash_rename.py --input {input.fasta} --output {output.fasta}"
+        "./scripts/seqhash_rename.py --input {input.fasta} --output {output.fasta}"
 
 rule transdecoder:
     input:
@@ -69,6 +69,11 @@ rule transdecoder:
         longest_orfs_gff3 = (Path(config['outdir']) / '{sample}/transdecoder') / '{sample}.gff3',
         longest_orfs_pep = (Path(config['outdir']) / '{sample}/transdecoder') / '{sample}.pep',
         longest_orfs_bed = (Path(config['outdir']) / '{sample}/transdecoder') / '{sample}.bed',
+    params:
+        original_cds = lambda wildcards: Path(config['outdir']) / '{wildcards.sample}/transdecoder/{wildcards.sample}_transcripts_renamed.fasta.transdecoder.cds',
+        original_gff3 = lambda wildcards: Path(config['outdir']) / '{wildcards.sample}/transdecoder/{wildcards.sample}_transcripts_renamed.fasta.transdecoder.gff3',
+        original_pep = lambda wildcards: Path(config['outdir']) / '{wildcards.sample}/transdecoder/{wildcards.sample}_transcripts_renamed.fasta.transdecoder.pep',
+        original_bed = lambda wildcards: Path(config['outdir']) / '{wildcards.sample}/transdecoder/{wildcards.sample}_transcripts_renamed.fasta.transdecoder.bed'
     run:
         shell(
             """
@@ -81,13 +86,12 @@ rule transdecoder:
             TransDecoder.Predict -t {input.fasta} --no_refine_starts --output_dir {output.outdir}
             """
         )
-
         shell(
-            """
-            mv {wildcards.sample}_transcripts_renamed.fasta.transdecoder.bed {output.longest_orfs_bed}
-            mv {wildcards.sample}_transcripts_renamed.fasta.transdecoder.cds {output.longest_orfs_cds}
-            mv {wildcards.sample}_transcripts_renamed.fasta.transdecoder.gff3 {output.longest_orfs_gff3}
-            mv {wildcards.sample}_transcripts_renamed.fasta.transdecoder.pep {output.longest_orfs_pep}
+            f"""
+            mv {params.original_bed} {output.longest_orfs_bed}
+            mv {params.original_cds} {output.longest_orfs_cds}
+            mv {params.original_gff3} {output.longest_orfs_gff3}
+            mv {params.original_pep} {output.longest_orfs_pep}
             """
         )
 

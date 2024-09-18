@@ -50,7 +50,7 @@ Fast compression to `*.fastq.gz`
 
 ### 4. Filter rRNA reads with `bbduk`
 
-The rRNA sequences are obtained from the SILVA database [https://www.arb-silva.de/download/arb-files/]. We remove reads that come from rRNA.
+The rRNA sequences are obtained from the [SILVA database] (https://www.arb-silva.de/download/arb-files/). We remove reads that come from rRNA.
 
 ### 5. Normalize read coverage with `bbnorm`
 
@@ -62,38 +62,138 @@ We even out the read coverage to make assembly more efficient.
 
 Just a sanity check.
 
-## Assembly
+## Assembling Genes
 
+`workflow/rules/assembly.smk`
 
+### 1. Assemble transcripts with `rnaSPAdes`
+
+We opt for [`rnaSPAdes`](https://gensoft.pasteur.fr/docs/SPAdes/3.14.0/rnaspades_manual.html) over [`Trinity`] (https://github.com/trinityrnaseq/trinityrnaseq) for speed and consistency. Modern reviews of RNAseq assemblers show it having comprable performance.
+
+**n.b.** This is why we explicitly normalize the reads before `rnaSPAdes`. `Trinity` would normalize as part of the pipeline.
+
+**n.b.** We also rename the output file from the generic `transcripts.fasta` to `{SRR_ID}_transcripts.fasta` for clarity.
+
+### 2. Rename headers with `seqhash`
+
+The FASTA headers from `rnaSPAdes` contain metadata information about the assembled transcript itself. For example:
+
+`>NODE_1_length_11323_cov_82.795022_g0_i0`
+
+Although this has useful information, we want something that:
+
+1. Uniquely identifies the sequence
+2. Is a stable identifier
+
+To this end, we use (`seqhash`)[https://keonigandall.com/posts/seqhash.html]. The headers will then look like:
+
+`>v1_DLS_f4afc4cb2e95c54f170cc1fe8bd33bb73b12b378ddccde59a53559c84a6d05bf NODE_1_length_11323_cov_82.795022_g0_i0`
+
+i.e., `{seqhash} {original_header}`. Downstream tools utilize the seqhash to identify the sequence.
+
+### 3. Predict ORFs with `TransDecoder`
+
+(`TransDecoder`)[https://github.com/TransDecoder/TransDecoder/wiki] will predict ORFs in the transcripts. It generates four files: a .bed file, a .gff3 file, a .cds (fasta) file, and a .pep (fasta) file. We use the .pep file for annotations.
+
+**n.b.** According to the GitHub, `TransDecoder` is no longer maintained as of March, 2024. This may pose an issue in the future.
 
 ## Annotation
 
-## Expression
+`workflow/rules/annotate.smk`
+
+### 1. Annotate with `eggnog-mapper`
+
+Predicted proteins (i.e. the `*.pep` file from `TransDecoder`) are functionally annotated with (`eggnog-mapper`)[https://github.com/eggnogdb/eggnog-mapper] using precomputed orthologs from the (eggNOG database)[http://eggnog5.embl.de/#/app/home].
+
+`eggnog-mapper` requires pre-downloaded eggNOG databases. We have downloaded these already an EBS attached to the cloud instance located in `/mnt/data`. When running the containerized pipeline, our `docker-compose.yml` mounts this volume.
+
+`eggnog-mapper` provides a script to download the databases. We downloaded MMSeqs2, HMMER, PFAM, and DIAMOND (for novel families) databases with:
+```console
+/opt/eggnog-mapper/download_eggnog_data.py -M -H -F -P --data_dir /mnt/data
+```
+
+The primary output of `eggnog-mapper` is a `{SRR_ID}.emapper.annotations` tab-delimited file and also `{SRR_ID}.emapper.annotations.xlsx` Excel file with the same contents.
+
+There are many fields in the annotation file. A full description can be found on the (eggNOG wiki)(https://github.com/eggnogdb/eggnog-mapper/wiki/eggNOG-mapper-v1#project_nameemapperannotations-file). I think there are a few columns that are of particular interest to us:
+
+- `query_name`: The seqhash for the transcript
+- `seed_ortholog`: Best predicted protein match in eggNOG
+- `Description`: The functional description
+- `Preferred_name`: The "standard" gene name
+- `COG_category`: The COG (clusters of orthologous groups)category of the ortholog. You can find descriptions of these [here](https://www.ncbi.nlm.nih.gov/research/cog#).
+- `GOs`: The gene ontology terms
+- `EC`: The EC number
+- `KEGG_Pathway, KEGG_Module, KEGG_Reaction, KEGG_rclass`: KEGG identifiers
+- `PFAMs`: Pfam domains
+
+### 2. Analyze the annotations with `parse_eggnog.py`
+
+A quick Python script to count the number of hits for each COG category and visualize the results.
+
+## Quantification
+
+`workflow/rules/quant.smk`
+
+### 1. Quantify expression with `salmon`
+
+We primarily use this for QC-purposes. We will use the RNAspades transcripts and the un-normalized reads.
+
+## Finalizing and uploading the results
+
+`workflow/rules/finalize.smk`
+
+### 1. QC Stats
+
+We gather a few statistics and upload the results to S3.
+
+For example, for our example Mesoplasma sample, we get:
+
+```console
+$ jq < SRR12068547_stats.json 
+{
+  "Number of Orthologs": 251,
+  "Number of Secondary Metabolite Genes": 0,
+  "Percent Mapped": 96.8,
+  "Number of Reads Mapped": 6771889.0,
+  "Total Reads (Before)": 16089680,
+  "Total Reads (After)": 14926556,
+  "Sequencing Type": "paired end (50 cycles + 50 cycles)",
+  "Number of Transcripts": 3894,
+  "Total Assembly Length": 1570556,
+  "N50": 386,
+  "ExN50": 290,
+  "Average Expression (TPM)": 256.81
+}
+```
+
+If we use a more interesting sample, such as SRR14292007, which is RNAseq of a lichen strain *Cladonia macilenta* that produces biruloquinone, we get:
+```
+$ jq < SRR14292007/SRR14292007_stats.json 
+{
+  "Number of Orthologs": 16763,
+  "Number of Secondary Metabolite Genes": 771,
+  "Percent Mapped": 97.91,
+  "Number of Reads Mapped": 50725894.0,
+  "Total Reads (Before)": 104107964,
+  "Total Reads (After)": 103881978,
+  "Sequencing Type": "paired end (100 cycles + 100 cycles)",
+  "Number of Transcripts": 15757,
+  "Total Assembly Length": 44849063,
+  "N50": 4125,
+  "ExN50": 7708,
+  "Average Expression (TPM)": 63.46
+}
+```
+
+We see that eggNOG identifies 16763 orthologs with 771 of them being known secondary metabolite genes! Maybe worth looking into.
+
+### 3. Upload to S3
+
+We then zip the output directory and upload to an S3 bucket.
 
 # snakemake dag
 ![dag](images/dag.png "dag")
 
-
-You can get a quick summary the pipeline's outputs:
-```console
-$ jq < output/SRR8053131/SRR8053131_stats.json
-{
-  "Number of Orthologs": 42707,
-  "Number of Secondary Metabolite Genes": 945,
-  "Percent Mapped": 88.21,
-  "Number of Reads Mapped": 79206071.0,
-  "Total Reads (Before)": 182858938,
-  "Total Reads (After)": 180926144,
-  "Sequencing Type": "paired end (50 cycles + 50 cycles)",
-  "Number of Transcripts": 126768,
-  "Total Assembly Length": 110773877,
-  "N50": 1372,
-  "ExN50": 980,
-  "Average Expression (TPM)": 7.89
-}
-```
-
-We see SRR8053131 has 42,707 orthologs and 945 secondary metabolite genes.
 
 
 # TODO
