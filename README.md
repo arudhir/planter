@@ -225,6 +225,34 @@ We then zip the output directory and upload to an S3 bucket.
 # snakemake dag
 ![dag](images/dag.png "dag")
 
+## Creating and Updating the Transcriptome Database
+
+We would like to iteratively collect transcripts we assemble into a non-redundant database we can use for downstream homology searches. For this, a utility script is provided in `scripts/ mmseqs_cluster_update.py` that takes in two inputs: the old FASTA file of transcripts and the new file we want to update it with.
+
+```console
+$ python scripts/mmseqs_cluster_update.py --help
+usage: mmseqs_cluster_update.py [-h] --old OLD --new NEW [-o OUTPUT_DIR] [-t TMP_DIR]
+
+Update MMSeqs2 clusters with new sequences.
+
+options:
+  -h, --help            show this help message and exit
+  --old OLD             Path to the old representative sequences FASTA file.
+  --new NEW             Path to the new sequences FASTA file to add.
+  -o OUTPUT_DIR, --output_dir OUTPUT_DIR
+                        Directory to store outputs.
+  -t TMP_DIR, --tmp_dir TMP_DIR
+                        Directory for temporary files.
+```
+
+This script wraps `mmseqs clusterupdate` and associated commands and statistics to allow easy updating of the transcriptome database.
+
+**n.b.** We are using `mmseqs clusterupdate` to ensure the stability of cluster assignments and avoid redundant clustering.
+
+## Homology Search
+
+Flask app in `app/`, `python app/main.py`
+
 
 
 # TODO
