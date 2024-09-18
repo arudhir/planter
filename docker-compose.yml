@@ -12,5 +12,5 @@ services:
       - .:/usr/src/planter
       - /mnt/data:/mnt/data
       # - ./outputs:/usr/src/planter/outputs
-      - /mnt/data/planter_outputs:/usr/src/planter/outputs
+      - /mnt/data2/planter_outputs:/usr/src/planter/outputs
 
