@@ -50,7 +50,7 @@ Fast compression to `*.fastq.gz`
 
 ### 4. Filter rRNA reads with `bbduk`
 
-The rRNA sequences are obtained from the (SILVA database)[https://www.arb-silva.de/download/arb-files/]. We remove reads that come from rRNA.
+The rRNA sequences are obtained from the [SILVA database](https://www.arb-silva.de/download/arb-files/). We remove reads that come from rRNA.
 
 ### 5. Normalize read coverage with `bbnorm`
 
@@ -68,7 +68,7 @@ Just a sanity check.
 
 ### 1. Assemble transcripts with `rnaSPAdes`
 
-We opt for [`rnaSPAdes`](https://gensoft.pasteur.fr/docs/SPAdes/3.14.0/rnaspades_manual.html) over [`Trinity`] (https://github.com/trinityrnaseq/trinityrnaseq) for speed and consistency. Modern reviews of RNAseq assemblers show it having comprable performance.
+We opt for [`rnaSPAdes`](https://gensoft.pasteur.fr/docs/SPAdes/3.14.0/rnaspades_manual.html) over [`Trinity`](https://github.com/trinityrnaseq/trinityrnaseq) for speed and consistency. Modern reviews of RNAseq assemblers show it having comprable performance.
 
 **n.b.** This is why we explicitly normalize the reads before `rnaSPAdes`. `Trinity` would normalize as part of the pipeline.
 
@@ -85,7 +85,7 @@ Although this has useful information, we want something that:
 1. Uniquely identifies the sequence
 2. Is a stable identifier
 
-To this end, we use (`seqhash`)[https://keonigandall.com/posts/seqhash.html]. The headers will then look like:
+To this end, we use [`seqhash`](https://keonigandall.com/posts/seqhash.html). The headers will then look like:
 
 `>v1_DLS_f4afc4cb2e95c54f170cc1fe8bd33bb73b12b378ddccde59a53559c84a6d05bf NODE_1_length_11323_cov_82.795022_g0_i0`
 
@@ -93,7 +93,7 @@ i.e., `{seqhash} {original_header}`. Downstream tools utilize the seqhash to ide
 
 ### 3. Predict ORFs with `TransDecoder`
 
-(`TransDecoder`)[https://github.com/TransDecoder/TransDecoder/wiki] will predict ORFs in the transcripts. It generates four files: a .bed file, a .gff3 file, a .cds (fasta) file, and a .pep (fasta) file. We use the .pep file for annotations.
+[`TransDecoder`](https://github.com/TransDecoder/TransDecoder/wiki) will predict ORFs in the transcripts. It generates four files: a .bed file, a .gff3 file, a .cds (fasta) file, and a .pep (fasta) file. We use the .pep file for annotations.
 
 **n.b.** According to the GitHub, `TransDecoder` is no longer maintained as of March, 2024. This may pose an issue in the future.
 
@@ -103,7 +103,7 @@ i.e., `{seqhash} {original_header}`. Downstream tools utilize the seqhash to ide
 
 ### 1. Annotate with `eggnog-mapper`
 
-Predicted proteins (i.e. the `*.pep` file from `TransDecoder`) are functionally annotated with (`eggnog-mapper`)[https://github.com/eggnogdb/eggnog-mapper] using precomputed orthologs from the (eggNOG database)[http://eggnog5.embl.de/#/app/home].
+Predicted proteins (i.e. the `*.pep` file from `TransDecoder`) are functionally annotated with [`eggnog-mapper`](https://github.com/eggnogdb/eggnog-mapper) using precomputed orthologs from the [eggNOG database](http://eggnog5.embl.de/#/app/home).
 
 `eggnog-mapper` requires pre-downloaded eggNOG databases. We have downloaded these already an EBS attached to the cloud instance located in `/mnt/data`. When running the containerized pipeline, our `docker-compose.yml` mounts this volume.
 
@@ -114,7 +114,7 @@ Predicted proteins (i.e. the `*.pep` file from `TransDecoder`) are functionally 
 
 The primary output of `eggnog-mapper` is a `{SRR_ID}.emapper.annotations` tab-delimited file and also `{SRR_ID}.emapper.annotations.xlsx` Excel file with the same contents.
 
-There are many fields in the annotation file. A full description can be found on the (eggNOG wiki)(https://github.com/eggnogdb/eggnog-mapper/wiki/eggNOG-mapper-v1#project_nameemapperannotations-file). I think there are a few columns that are of particular interest to us:
+There are many fields in the annotation file. A full description can be found on the [eggNOG wiki](https://github.com/eggnogdb/eggnog-mapper/wiki/eggNOG-mapper-v1#project_nameemapperannotations-file). I think there are a few columns that are of particular interest to us:
 
 - `query_name`: The seqhash for the transcript
 - `seed_ortholog`: Best predicted protein match in eggNOG
@@ -144,7 +144,7 @@ We primarily use this for QC-purposes. We will use the RNAspades transcripts and
 
 ### 1. QC Stats
 
-We gather a few statistics and upload the results to S3.
+We gather some key statistics from our various analyses and upload the results to S3.
 
 For example, for our example Mesoplasma sample, we get:
 
