@@ -297,9 +297,9 @@ find signatures -name '*.sig.gz' | xargs sourmash gather SRR2103848_trinity.Trin
 
 ### Test Enzymes
 
-SRR5936537|: Genbank AUI41117.1|A0A2I6B3N5|Rhodiola rosea
-SRR8053131|Piper methysticum: Genbank QCX36371.1|A0A384E132|Piper methysticum
-SRR29142729|Gerbera hybrid cultivar: Genbank QCX36376.1|A0A4Y5QR90|Piper methysticum
-SRR22420515: Genbank BBI55602.1|BBI55602.1|
+- SRR5936537|: Genbank AUI41117.1|A0A2I6B3N5|Rhodiola rosea
+- SRR8053131|Piper methysticum: Genbank QCX36371.1|A0A384E132|Piper methysticum
+- SRR29142729|Gerbera hybrid cultivar: Genbank QCX36376.1|A0A4Y5QR90|Piper methysticum
+- SRR22420515: Genbank BBI55602.1|BBI55602.1|
 
-SRR12068547 is Mesoplasma. JC got it!
+- SRR12068547 is Mesoplasma. JC got it!
