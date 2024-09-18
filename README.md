@@ -253,36 +253,32 @@ This script wraps `mmseqs clusterupdate` and associated commands and statistics 
 
 Flask app in `app/`, `python app/main.py`
 
+![mmseqs-search](images/mmseqs-search.png "mmseqs-search")
+![mmseqs-search-results](images/mmseqs-search-results.png "mmseqs-search-results")
 
 
 # TODO
 
-- [ ] Write script that finalizes the output metadata
-    - [ ] Number of reads
-    - [ ] Number of rRNA reads
-    - [ ] Number of contigs
+- [ x ] Write script that finalizes the output metadata
+    - [ x ] Number of reads
+    - [ x ] Number of rRNA reads
+    - [ x ] Number of contigs
     - [ ] Number of TransDecoder predicted ORFs
     - [ ] Number of TransDecoder predicted proteins
     - [ ] Number of EggNOG Orthologs
     - [ ] Distribution of COG annotations
-    - [ ] Percentage of reads mapped to the SPAdes transcripts
-- [ ] Create database of transcripts
-    - [ ] Generate clustered representative transcripts
-- [ ] Create Flask app to serve the homology search
+    - [ x ] Percentage of reads mapped to the SPAdes transcripts
+- [ x ] Create database of transcripts
+    - [ x ] Generate clustered representative transcripts
+    - [ x ] Come up with S3 scheme
+- [ x ] Create Flask app to serve the homology search
 
-# Test Samples
+## Misc Notes
 
 SRR5936537: https://www.ncbi.nlm.nih.gov/sra/?term=SRR5936537
 SRR8053131: https://www.ncbi.nlm.nih.gov/sra/?term=SRR8053131
 SRR29142729: https://www.ncbi.nlm.nih.gov/sra/?term=SRR29142729
 SRR22420515: https://www.ncbi.nlm.nih.gov/sra/?term=SRR22420515
-
-
-Notes:
-
-- SRR2103848 implies that there are some contaminants. i notice insect orthologs mixed in with the flower. we should screen with sourmash to figure out what we ought to use to filter. or perhaps another way to filter reads. that should make assemblies faster
-- rnaspades bc its slow. but we'd need to probably normalize
-- sourmash --> download reference genome --> filter?
 
 Downloading Viridiplantae, green plants
 ```bash
@@ -313,15 +309,4 @@ SRR8053131|Piper methysticum: Genbank QCX36371.1|A0A384E132|Piper methysticum
 SRR29142729|Gerbera hybrid cultivar: Genbank QCX36376.1|A0A4Y5QR90|Piper methysticum
 SRR22420515: Genbank BBI55602.1|BBI55602.1|
 
-
-
-
-# NOTE
-
 SRR12068547 is Mesoplasma. JC got it!
-
-# TODO
-
-1. Work out how to get the other members of a cluster
-2. Get the eggNOG annotations as part of the search output
-3. Attach the metadata for the SRA ID for the seqhash hit
