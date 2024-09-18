@@ -18,6 +18,37 @@ $ docker-compose run --rm planter \
         s3_bucket="recombia.planter"  # Run the pipeline
 ```
 
+Example output structure:
+```console
+├── SRR12068547_stats.json
+├── eggnog
+│   ├── SRR12068547.emapper.annotations
+│   ├── SRR12068547.emapper.annotations.xlsx
+│   └── plots
+│       ├── cog_category_counts.csv
+│       └── cog_distribution_plot.png
+├── illumina
+│   ├── processed                                       # Trimmed, rRNA filtered, normalized; used for assembly
+│   │   ├── SRR12068547.1.fq.gz                 
+│   │   ├── SRR12068547.2.fq.gz
+│   │   ├── SRR12068547_fastp.html
+│   │   └── SRR12068547_fastp.json
+│   └── rrna_filtered                                   # Trimmed, rRNA filtered; used for quant
+│       ├── SRR12068547.1.fq.gz
+│       ├── SRR12068547.2.fq.gz
+│       ├── SRR12068547_rRNA_filter.log
+│       └── SRR12068547_rRNA_filter.stats
+├── quants
+│   ├── SRR12068547.quant.tsv                           # NumReads (for DESeq2) and TPM counts
+=├── rnaspades
+│   ├── SRR12068547_transcripts_renamed.fasta           # Headers renamed to seqhashes
+│   ├── transcripts.fasta                            
+└── transdecoder
+    ├── SRR12068547.bed
+    ├── SRR12068547.cds
+    ├── SRR12068547.gff3
+    ├── SRR12068547.pep                                 # Predicted proteins; used for eggNOG
+`
 # Workflow
 
 ## Read Processing
