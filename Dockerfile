@@ -34,6 +34,7 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     python-is-python3 \
     python3-venv \
+    pipx \
     progressivemauve \
     fastqc \
     wget \
@@ -41,7 +42,7 @@ RUN apt-get update && apt-get install -y \
 
 # TODO: Move to uv Install uv
 #RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-RUN pip install uv --break-system-packages
+# RUN pip install uv --break-system-packages
 #COPY --from=ghcr.io/astral-sh/uv:0.4.6 /uv /bin/uv
 
 # Set up Python virtual environment
@@ -50,13 +51,14 @@ RUN python3 -m venv $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Verify we're using the correct Python and pip
-RUN which python3 && which pip
+# RUN which python3 && which pip
 
 # Copy requirements file
 COPY requirements.txt .
 
 # Install Python packages
 RUN pip install --upgrade pip && pip install -r requirements.txt
+# RUN pipx install -r requirements.txt
 
 # Set the working directory
 WORKDIR $TOOLS
