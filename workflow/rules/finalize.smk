@@ -21,8 +21,11 @@ def upload_to_s3(zip_archive):
     try:
         s3.upload_file(zip_archive, config['s3_bucket'], zip_filename)  # using just the filename in S3
         print(f"Successfully uploaded {zip_filename} to {config['s3_bucket']}")
+        success = True
     except Exception as e:
         print(f"Failed to upload {zip_filename}: {e}")
+        success = False
+    return success
 
 
 
@@ -54,6 +57,7 @@ rule finalize:
         quant = expand(rules.quant.output, sample=config['samples']),
     output:
         zip_archive = expand(Path(config['outdir']) / '{sample}.zip', sample=config['samples']),
+        done = temp(expand(Path(config['outdir']) / '{sample}/{sample}_s3_upload.done', sample=config['samples']))
     run:
         samples = config['samples']
         if type(config['samples']) != list:
@@ -62,4 +66,6 @@ rule finalize:
             print('Finalizing sample: ', sample)
             output_dir = Path(config['outdir']) / sample
             zip_archive = create_zip_archive(output_dir)
-            upload_to_s3(zip_archive)
+            success = upload_to_s3(zip_archive)
+            if success:
+                (Path(config['outdir']) / f'{sample}/{sample}_s3_upload.done').touch()

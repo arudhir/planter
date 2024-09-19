@@ -16,4 +16,4 @@ services:
       # - ./outputs:/usr/src/planter/outputs
       - /mnt/data2/planter_outputs:/usr/src/planter/outputs
       - /mnt/data2/tmp:/tmp
-
+      - ~/.aws:/root/.aws
