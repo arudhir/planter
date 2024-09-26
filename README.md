@@ -1,4 +1,4 @@
-# planter: work in progress
+/ planter: work in progress
 
 # vision
 ![full](images/planter.png "planter")
@@ -21,7 +21,7 @@ $ docker-compose run --rm planter \
         --cores 16 \
         --config samples="SRR12068547" \
         outdir="outputs" \
-        s3_bucket="recombia.planter"  # Run the pipeline
+        s3_bucket=$S3_BUCKET  # Run the pipeline
 ```
 
 Example output structure:
