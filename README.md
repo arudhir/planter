@@ -7,6 +7,12 @@ we want to assemble and annotate transcripts
 
 # quickstart
 
+## requirements
+
+* ~12gb ram
+* docker & docker-compose
+
+
 These two commands will do a transcriptome assembly and annotation for Mesoplasma florum:
 ```console
 $ make image  # Build the docker image
