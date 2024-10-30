@@ -6,7 +6,7 @@ import json
 import argparse
 from Bio import SeqIO
 from pprint import pprint
-
+from get_srr_metadata import get_sra_info
 def parse_eggnog(eggnog_file):
     stats = {}
     df = pd.read_csv(eggnog_file, sep='\t', comment='#', header=None)
@@ -107,8 +107,12 @@ def get_transcript_stats(rnaspades_file, salmon_quantsf):
 
     return stats
 
+def get_organism_from_sample(sample):
+    organism = get_sra_info(sample)['organism']
+    return {'sample': sample, 'organism': organism}
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Get QC stats")
+    parser.add_argument("--sample", help="SRA Sample ID", required=True)
     parser.add_argument("--eggnog", help="Path to eggNOG annotation file", required=True)
     parser.add_argument("--salmon_metadata", help="Path to salmon quant metadata file", required=True)
     parser.add_argument("--fastp", help="Path to fastp JSON file", required=True)
@@ -118,11 +122,12 @@ def parse_arguments():
     return parser.parse_args()
 
 def get_stats(args):
+    organism_stats = get_organism_from_sample(args.sample)
     annotation_stats = parse_eggnog(args.eggnog)
     mapping_stats = parse_salmon(args.salmon_metadata)
     read_stats = parse_fastp(args.fastp)
     transcript_stats = get_transcript_stats(args.transcripts, args.quantsf)
-    stats = {**annotation_stats, **mapping_stats, **read_stats, **transcript_stats}
+    stats = {**organism_stats, **annotation_stats, **mapping_stats, **read_stats, **transcript_stats}
     return stats
 
 def main():
