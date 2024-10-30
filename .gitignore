@@ -3,3 +3,4 @@ tests/test-output
 references/*
 .snakemake/*
 __pycache__
+*/mmseqs_tmp

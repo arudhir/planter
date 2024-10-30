@@ -1,4 +1,4 @@
-/ planter: work in progress
+# planter: work in progress
 
 # vision
 ![full](images/planter.png "planter")
