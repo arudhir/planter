@@ -42,6 +42,7 @@ rule get_qc_stats:
     run:
         shell(
             'scripts/get_qc_stats.py '
+            '--sample {wildcards.sample} '
             '--fastp {input.fastp} '
             '--salmon_metadata {input.salmon_metadata} '
             '--transcripts {input.transcripts} '
