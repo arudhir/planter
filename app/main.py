@@ -3,12 +3,12 @@ import subprocess
 import tempfile
 import os
 import logging
-from config import config
+from app.config import config
+from planter.database.query_manager import DatabaseManager
 
 def create_app(config_name='default'):
     app = Flask(__name__)
     app.config.from_object(config[config_name])
-    
     logging.basicConfig(level=logging.DEBUG)
 
     @app.route('/', methods=['GET', 'POST'])
@@ -29,6 +29,18 @@ def create_app(config_name='default'):
             app.logger.error(f"Error loading example: {str(e)}")
             return jsonify({'error': 'Failed to load example sequence'}), 500
 
+    def get_sequence_annotations(seqhash_ids):
+        """Debug database annotations fetch"""
+        app.logger.debug(f"Fetching annotations for: {seqhash_ids}")
+        try:
+            with DatabaseManager(app.config['DUCKDB_PATH']) as db:
+                annotations = db.query_manager.sequence_annotations(seqhash_ids)
+                app.logger.debug(f"Found annotations: {annotations}")
+                return annotations.set_index('seqhash_id').to_dict('index')
+        except Exception as e:
+            app.logger.error(f"Database error: {e}")
+            return {}
+
     def run_mmseqs2_easy_search(sequence):
         app.logger.debug(f"Starting MMSeqs2 search with sequence: {sequence}")
         
@@ -48,27 +60,48 @@ def create_app(config_name='default'):
                 
                 process = subprocess.run(mmseqs_command, capture_output=True, text=True, check=True)
                 
-                app.logger.debug(f"MMSeqs2 stdout: {process.stdout}")
-                app.logger.debug(f"MMSeqs2 stderr: {process.stderr}")
-                
                 if os.path.exists(output_file):
                     with open(output_file, 'r') as f:
                         results = f.read().splitlines()
                     
-                    # Parse results into list of dictionaries
-                    headers = ['query', 'target', 'pident', 'alnlen', 'mismatch', 'gapopen', 'qstart', 'qend', 'tstart', 'tend', 'evalue', 'bits']
+                    # Parse MMSeqs2 results
+                    headers = ['query', 'target', 'pident', 'alnlen', 'mismatch', 'gapopen', 
+                             'qstart', 'qend', 'tstart', 'tend', 'evalue', 'bits']
                     parsed_results = [dict(zip(headers, row.split('\t'))) for row in results]
                     
-                    return {'headers': headers, 'data': parsed_results}
+                    # Get target sequence IDs
+                    seqhash_ids = [row['target'] for row in parsed_results]
+                    app.logger.debug(f"Searching for seqhash_ids: {seqhash_ids}")
+                    annotations = get_sequence_annotations(seqhash_ids)
+                    app.logger.debug(f"Retrieved annotations: {annotations}")
+                                        
+                    # Get annotations from database
+                    annotations = get_sequence_annotations(seqhash_ids)
+                    
+                    # Merge MMSeqs2 results with annotations
+                    merged_results = []
+                    for result in parsed_results:
+                        target_id = result['target']
+                        if target_id in annotations:
+                            result.update(annotations[target_id])
+                        merged_results.append(result)
+                    
+                    # Update headers with annotation fields
+                    desired_headers = [
+                        'query', 'target', 'pident', 'alnlen', 'mismatch', 'gapopen', 
+                        'qstart', 'qend', 'tstart', 'tend', 'evalue', 'bits',
+                        'organism', 'description', 'preferred_name', 'cog_category', 
+                        'go_terms', 'ec_numbers', 'kegg_ko', 'kegg_pathway'
+                    ]
+                    headers = [h for h in desired_headers if any(h in d for d in merged_results)]
+                    
+                    return {'headers': headers, 'data': merged_results}
                 else:
                     return {'headers': ['Error'], 'data': [{'Error': "MMSeqs2 did not produce output file"}]}
-            
-            except subprocess.CalledProcessError as e:
-                app.logger.error(f"MMSeqs2 failed: {e}")
-                return {'headers': ['Error'], 'data': [{'Error': f"MMSeqs2 search failed. Return code: {e.returncode}, Error: {e.stderr}"}]}
+                    
             except Exception as e:
-                app.logger.error(f"Unexpected error: {e}")
-                return {'headers': ['Error'], 'data': [{'Error': f"An unexpected error occurred: {str(e)}"}]}
+                app.logger.error(f"Error: {e}")
+                return {'headers': ['Error'], 'data': [{'Error': str(e)}]}
 
     return app
 

@@ -47,14 +47,27 @@
 
     <script type="text/javascript">
         $(document).ready(function() {
+            var headers = {{ results.headers | tojson | safe }};
+            
             $('#resultsTable').DataTable({
-                "pageLength": 25, // Show 25 entries per page
-                "order": [[10, "asc"]], // Sort by E-value (11th column) ascending by default
+                "pageLength": 25,
+                "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+                "order": [[10, "asc"]],
                 "columnDefs": [
-                    { "type": "scientific", "targets": 10 } // Use scientific sort for E-value column
-                ]
+                    { "type": "scientific", "targets": 10 },
+                    {
+                        "targets": "_all",
+                        "render": function(data, type, row, meta) {
+                            return row[headers[meta.col]] || '';
+                        }
+                    }
+                ],
+                "scrollX": true,
+                "ordering": true,
+                "searching": true
+
             });
-        });
+
     </script>
-</body>
+    </body>
 </html>
