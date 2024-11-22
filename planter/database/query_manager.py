@@ -1,15 +1,22 @@
+import os
 import duckdb
-from planter.database.queries.organism_queries import OrganismQueries
-from planter.database.queries.sample_queries import SampleQueries
-from planter.database.queries.sequence_queries import SequenceQueries
+from planter.database.queries import BaseQueryManager
 
 class DatabaseManager:
-    """Handles querying the sequence database."""
+    """Manages database connection and queries."""
     def __init__(self, db_path: str):
+        sql_dir = os.path.join(os.path.dirname(__file__), 'queries', 'sql')  # directory for SQL files
         self.con = duckdb.connect(db_path)
-        self.organism_queries = OrganismQueries(self.con)
-        self.sample_queries = SampleQueries(self.con)
-        self.sequence_queries = SequenceQueries(self.con)
+        self.query_manager = BaseQueryManager(self.con, sql_dir)
+
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit."""
+        self.close()
 
     def close(self):
+        """Close the database connection."""
         self.con.close()
