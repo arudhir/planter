@@ -262,6 +262,9 @@ Flask app in `app/`, `python app/main.py`
 ![mmseqs-search](images/mmseqs-search.png "mmseqs-search")
 ![mmseqs-search-results](images/mmseqs-search-results.png "mmseqs-search-results")
 
+# Database
+
+![schema](images/schema.png "schema")
 
 # TODO
 
