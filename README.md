@@ -264,6 +264,7 @@ Flask app in `app/`, `python app/main.py`
 
 # Database
 
+![simplified-vision](images/simplified-vision.png "simplified-vision")
 ![schema](images/schema.png "schema")
 
 # TODO
