@@ -1,5 +1,6 @@
 import os
 from functools import partial
+from jinja2 import Template
 
 class BaseQueryManager:
     def __init__(self, con, sql_dir: str):
@@ -14,9 +15,17 @@ class BaseQueryManager:
                 query_name = file[:-4]  # remove ".sql" extension
                 setattr(self, query_name, partial(self._execute_query, query_name))
 
-    def _execute_query(self, query_name: str, *params):
-        """Load and execute a query by name with optional parameters."""
+    def _execute_query(self, query_name: str, params: dict = None, values: list = None):
         sql_path = os.path.join(self.sql_dir, f"{query_name}.sql")
         with open(sql_path, 'r') as file:
-            query = file.read()
-        return self.con.execute(query, params).fetchdf()
+            query_template = file.read()
+
+        # render jinja2 template if params are provided
+        if params:
+            template = Template(query_template)
+            query = template.render(**params)
+        else:
+            query = query_template
+
+        # execute query, using positional values if provided
+        return self.con.execute(query, values).fetchdf() if values else self.con.execute(query).fetchdf()
