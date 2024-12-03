@@ -58,7 +58,7 @@ rule rename_headers:
     output:
         fasta = Path(config['outdir']) / '{sample}/rnaspades/{sample}_transcripts_renamed.fasta'
     shell:
-        "./scripts/seqhash_rename.py --input {input.fasta} --output {output.fasta}"
+        "./planter/scripts/seqhash_rename.py --input {input.fasta} --output {output.fasta}"
 
 rule transdecoder:
     input:

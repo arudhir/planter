@@ -41,7 +41,7 @@ rule get_qc_stats:
     threads: workflow.cores        
     run:
         shell(
-            'scripts/get_qc_stats.py '
+            './planter/scripts/get_qc_stats.py '
             '--sample {wildcards.sample} '
             '--fastp {input.fastp} '
             '--salmon_metadata {input.salmon_metadata} '

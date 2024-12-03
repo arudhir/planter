@@ -31,5 +31,5 @@ rule analyze_eggnog:
         directory(Path(config['outdir']) / '{sample}/eggnog/plots')
     run:
         shell(
-            'scripts/parse_eggnog.py {input.annotations} {output}'
+            './planter/scripts/parse_eggnog.py {input.annotations} {output}'
         )
