@@ -20,12 +20,17 @@ class BaseQueryManager:
         with open(sql_path, 'r') as file:
             query_template = file.read()
 
-        # render jinja2 template if params are provided
         if params:
+            if not isinstance(params, dict):
+                raise TypeError(f"'params' must be a dictionary, got {type(params)} instead.")
             template = Template(query_template)
             query = template.render(**params)
         else:
             query = query_template
 
-        # execute query, using positional values if provided
         return self.con.execute(query, values).fetchdf() if values else self.con.execute(query).fetchdf()
+
+
+
+
+

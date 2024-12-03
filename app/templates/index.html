@@ -10,10 +10,17 @@
         h1 { color: #333; }
         textarea { width: 100%; height: 200px; margin-bottom: 10px; }
         button { padding: 10px 20px; margin-right: 10px; }
+        img { max-width: 200px; margin-bottom: 20px; } /* optional styling for the logo */
     </style>
 </head>
 <body>
+    <!-- logo -->
+    <img src="{{ url_for('static', filename='images/recombia-logo.png') }}" alt="Recombia Logo" />
+
+    <!-- heading -->
     <h1>MMSeqs2 Search</h1>
+
+    <!-- form -->
     <form method="POST">
         <textarea name="sequence" id="sequenceInput" placeholder="Enter your protein sequence here"></textarea>
         <br>

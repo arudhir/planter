@@ -508,3 +508,24 @@ class SequenceDBBuilder:
         LEFT JOIN clusters c ON cm.cluster_id = c.cluster_id
         """
         return self.con.execute(summary_query).df()
+
+    def update_database(self, sample_ids: List[str]) -> pd.DataFrame:
+        """Update existing database with new samples."""
+        if not self.con.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall():
+            raise ValueError("Database not initialized. Use build_database() for new databases.")
+        
+        results = []
+        for sample_id in sample_ids:
+            result = self.process_sample(sample_id)
+            results.append(result)
+            
+            if result.status == 'success':
+                self.logger.info(
+                    f"Added {sample_id}: "
+                    f"{result.sequences_loaded} sequences, "
+                    f"{result.annotations_loaded} annotations"
+                )
+            else:
+                self.logger.error(f"Failed to add {sample_id}: {result.error}")
+        
+        return pd.DataFrame([vars(r) for r in results])
