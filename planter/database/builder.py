@@ -336,9 +336,94 @@ class SequenceDBBuilder:
         
         return annotations_loaded
 
+    def _check_sample_exists(self, sample_id: str) -> bool:
+        """Check if a sample ID already exists in the database."""
+        result = self.con.execute(
+            "SELECT COUNT(*) FROM sra_metadata WHERE sample_id = ?", 
+            [sample_id]
+        ).fetchone()[0]
+        return result > 0
+
+    # def process_sample(self, sample_id: str) -> ProcessingResult:
+    #     """Process a single sample: fetch metadata and load sequence data."""
+    #     try:
+    #         paths = self._get_sample_paths(sample_id)
+            
+    #         if not paths.sequences.exists():
+    #             raise FileNotFoundError(f"Sequence file not found: {paths.sequences}")
+            
+    #         metadata = self._fetch_sra_metadata(sample_id)
+            
+    #         def _process():
+    #             # Insert metadata
+    #             if metadata:
+    #                 self.con.execute("DELETE FROM sra_metadata WHERE sample_id = ?", [sample_id])
+    #                 self.con.execute("""
+    #                     INSERT INTO sra_metadata (
+    #                         sample_id, organism, study_title, study_abstract,
+    #                         bioproject, biosample, library_strategy, library_source,
+    #                         library_selection, library_layout, instrument,
+    #                         run_spots, run_bases, run_published
+    #                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    #                 """, [
+    #                     sample_id,
+    #                     metadata.get('organism'),
+    #                     metadata.get('study_title'),
+    #                     metadata.get('study_abstract'),
+    #                     metadata.get('bioproject'),
+    #                     metadata.get('biosample'),
+    #                     metadata.get('library', {}).get('strategy'),
+    #                     metadata.get('library', {}).get('source'),
+    #                     metadata.get('library', {}).get('selection'),
+    #                     metadata.get('library', {}).get('layout'),
+    #                     metadata.get('instrument'),
+    #                     metadata.get('run', {}).get('spots'),
+    #                     metadata.get('run', {}).get('bases'),
+    #                     metadata.get('run', {}).get('published')
+    #                 ])
+                
+    #             # Load sequences
+    #             duplicates = []
+    #             sequences_loaded = self._load_sequences(paths.sequences, sample_id, duplicates)
+                
+    #             # Load annotations if available
+    #             annotations_loaded = 0
+    #             if paths.annotations.exists():
+    #                 annotations_loaded = self._load_annotations(paths.annotations, sample_id)
+    #             else:
+    #                 self.logger.warning(f"No annotation file found: {paths.annotations}")
+                
+    #             return sequences_loaded, annotations_loaded, duplicates
+
+    #         # Execute everything in a single transaction
+    #         sequences_loaded, annotations_loaded, duplicates = self.execute_transaction(_process)
+            
+    #         return ProcessingResult(
+    #             sample_id=sample_id,
+    #             status='success',
+    #             sequences_loaded=sequences_loaded,
+    #             annotations_loaded=annotations_loaded,
+    #             duplicates=len(duplicates)
+    #         )
+            
+    #     except Exception as e:
+    #         self.logger.error(f"Error processing {sample_id}: {str(e)}")
+    #         return ProcessingResult(
+    #             sample_id=sample_id,
+    #             status='error',
+    #             error=str(e)
+    #         )
     def process_sample(self, sample_id: str) -> ProcessingResult:
         """Process a single sample: fetch metadata and load sequence data."""
         try:
+            # Check if sample already exists
+            if self._check_sample_exists(sample_id):
+                return ProcessingResult(
+                    sample_id=sample_id,
+                    status='error',
+                    error=f"Sample {sample_id} already exists in the database"
+                )
+
             paths = self._get_sample_paths(sample_id)
             
             if not paths.sequences.exists():
@@ -405,9 +490,13 @@ class SequenceDBBuilder:
                 status='error',
                 error=str(e)
             )
-
+        
     def build_database(self, sample_ids: List[str]) -> pd.DataFrame:
         """Build complete database from list of SRA IDs."""
+        # Check if database already has data
+        if self._check_database_exists():
+            raise ValueError("Database already contains data. Use update_database() to add new samples.")
+
         # Initialize database
         self.init_database()
         
@@ -427,6 +516,48 @@ class SequenceDBBuilder:
                 )
             else:
                 self.logger.error(f"Failed to process {sample_id}: {result.error}")
+        
+        return pd.DataFrame([vars(r) for r in results])
+
+    def _check_database_exists(self) -> bool:
+        """Check if database has existing data."""
+        tables = self.con.execute("""
+            SELECT name FROM sqlite_master 
+            WHERE type='table' AND name='sra_metadata'
+        """).fetchall()
+        if not tables:
+            return False    
+        count = self.con.execute("SELECT COUNT(*) FROM sra_metadata").fetchone()[0]
+        return count > 0
+
+    def update_database(self, sample_ids: List[str]) -> pd.DataFrame:
+        """Update existing database with new samples."""
+        if not self._check_database_exists():
+            raise ValueError("Database not initialized. Use build_database() for new databases.")
+        
+        results = []
+        for sample_id in sample_ids:
+            # Check for duplicates before processing
+            if self._check_sample_exists(sample_id):
+                results.append(ProcessingResult(
+                    sample_id=sample_id,
+                    status='error',
+                    error=f"Sample {sample_id} already exists in the database"
+                ))
+                self.logger.warning(f"Skipping {sample_id}: already exists in database")
+                continue
+                
+            result = self.process_sample(sample_id)
+            results.append(result)
+            
+            if result.status == 'success':
+                self.logger.info(
+                    f"Added {sample_id}: "
+                    f"{result.sequences_loaded} sequences, "
+                    f"{result.annotations_loaded} annotations"
+                )
+            else:
+                self.logger.error(f"Failed to add {sample_id}: {result.error}")
         
         return pd.DataFrame([vars(r) for r in results])
 

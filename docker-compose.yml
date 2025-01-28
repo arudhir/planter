@@ -6,7 +6,7 @@ services:
     stdin_open: True
     tty: True
     environment:
-      - TMPDIR=/mnt/data2/tmp
+      - TMPDIR=/mnt/data3/tmp
     volumes:
       - ./planter/workflow:/planter/workflow
       - ./tests:/usr/src/planter/tests
@@ -14,6 +14,6 @@ services:
       - .:/usr/src/planter
       - /mnt/data:/mnt/data
       # - ./outputs:/usr/src/planter/outputs
-      - /mnt/data2/planter_outputs:/usr/src/planter/outputs
-      - /mnt/data2/tmp:/tmp
+      - /mnt/data3/planter_outputs:/usr/src/planter/outputs
+      - /mnt/data3/tmp:/tmp
       - ~/.aws:/root/.aws

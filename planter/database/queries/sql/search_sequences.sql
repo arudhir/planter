@@ -9,6 +9,7 @@ SELECT DISTINCT
     a.evalue,
     a.seed_ortholog,
     a.max_annot_lvl,
+    a.eggnog_ogs,
     c.cluster_id,
     c.size AS cluster_size,
     m.organism,

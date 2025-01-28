@@ -30,7 +30,7 @@ rule rnaspades:
     output:
         fasta = Path(config['outdir']) / '{sample}/rnaspades/transcripts.fasta'
     params:
-        memory = 13,
+        memory = 10,
         rnaspades_outdir = directory(Path(config['outdir']) / '{sample}/rnaspades'),
     threads: workflow.cores / 2
     run:
