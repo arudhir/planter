@@ -61,7 +61,6 @@ COPY requirements.txt .
 
 # Install Python packages
 RUN pip install --upgrade pip && pip install -r requirements.txt
-# RUN pipx install -r requirements.txt
 
 # Set the working directory
 WORKDIR $TOOLS
