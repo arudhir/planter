@@ -80,7 +80,7 @@ rule get_qc_stats:
         )
 
 
-rule finalize:
+rule upload_to_s3:
     input:
         analyze_eggnog = expand(rules.analyze_eggnog.output, sample=config['samples']),
         quant = expand(rules.quant.output, sample=config['samples']),
@@ -102,3 +102,16 @@ rule finalize:
                 (Path(config['outdir']) / f'{sample}/{sample}_s3_upload.done').touch()
             else:
                 print(f"Encountered errors uploading {sample}; not creating .done file.")
+
+rule create_duckdb:
+    input:
+        analyze_eggnog = expand(rules.analyze_eggnog.output, sample=config['samples']),
+        quant = expand(rules.quant.output, sample=config['samples']),
+    output:
+        duckdb = Path(config['outdir']) / '{sample}/{sample}.duckdb'
+    run:
+        shell(
+            'python3 '
+            './planter/scripts/create_duckdb.py '
+            ' --sample_id {wildcards.sample}'
+        )
