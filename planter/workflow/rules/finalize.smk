@@ -79,11 +79,27 @@ rule get_qc_stats:
             '--output_file {output.qc_stats}'
         )
 
+rule create_duckdb:
+    input:
+        analyze_eggnog = expand(rules.analyze_eggnog.output, sample=config['samples']),
+        quant = expand(rules.quant.output, sample=config['samples']),
+    output:
+        duckdb = Path(config['outdir']) / '{sample}/{sample}.duckdb'
+    params:
+        outdir = lambda wildcards: Path(config['outdir'])
+    run:
+        shell(
+            'python ./planter/scripts/create_duckdb.py '
+            ' --sample_id {wildcards.sample} '
+            ' --outdir {params.outdir} '
+            ' --duckdb_out {output.duckdb}'
+        )
 
 rule upload_to_s3:
     input:
         analyze_eggnog = expand(rules.analyze_eggnog.output, sample=config['samples']),
         quant = expand(rules.quant.output, sample=config['samples']),
+        duckdb = expand(rules.create_duckdb.output, sample=config['samples']),
     output:
         done = expand(Path(config['outdir']) / '{sample}/{sample}_s3_upload.done', sample=config['samples'])
     run:
@@ -102,19 +118,3 @@ rule upload_to_s3:
                 (Path(config['outdir']) / f'{sample}/{sample}_s3_upload.done').touch()
             else:
                 print(f"Encountered errors uploading {sample}; not creating .done file.")
-
-rule create_duckdb:
-    input:
-        analyze_eggnog = expand(rules.analyze_eggnog.output, sample=config['samples']),
-        quant = expand(rules.quant.output, sample=config['samples']),
-    output:
-        duckdb = Path(config['outdir']) / '{sample}.duckdb'
-    params:
-        outdir = lambda wildcards: Path(config['outdir'])
-    run:
-        shell(
-            'python ./planter/scripts/create_duckdb.py '
-            ' --sample_id {wildcards.sample} '
-            ' --outdir {params.outdir} '
-            ' --duckdb_out {output.duckdb}'
-        )
