@@ -108,10 +108,13 @@ rule create_duckdb:
         analyze_eggnog = expand(rules.analyze_eggnog.output, sample=config['samples']),
         quant = expand(rules.quant.output, sample=config['samples']),
     output:
-        duckdb = Path(config['outdir']) / '{sample}/{sample}.duckdb'
+        duckdb = Path(config['outdir']) / '{sample}.duckdb'
+    params:
+        outdir = lambda wildcards: Path(config['outdir'])
     run:
         shell(
-            'python3 '
-            './planter/scripts/create_duckdb.py '
-            ' --sample_id {wildcards.sample}'
+            'python ./planter/scripts/create_duckdb.py '
+            ' --sample_id {wildcards.sample} '
+            ' --outdir {params.outdir} '
+            ' --duckdb_out {output.duckdb}'
         )

@@ -1,5 +1,5 @@
 
-configfile: "workflow/config.yaml"
+configfile: "planter/workflow/config.yaml"
 outdir = config['outdir']
 
 include: 'rules/reads.smk'
@@ -22,4 +22,4 @@ rule all:
         expand(rules.quant.output, sample=samples),
         expand(rules.get_qc_stats.output, sample=samples),
         expand(rules.upload_to_s3.output, sample=samples),
-        # expand(rules.create_duckdb.output, sample=samples)
+        expand(rules.create_duckdb.output, sample=samples)

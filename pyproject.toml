@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=64.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "planter"
+version = "0.1.0"
+description = "Bioinformatics pipeline for genomic analysis"
+requires-python = ">=3.8"
+dependencies = [
+    "snakemake>=7.32.4",
+    "duckdb",
+]
+
+[project.scripts]
+planter = "planter.cli:main"
+
+[tool.setuptools]
+packages = ["planter"]
+package-data = {"planter" = ["workflow/*", "workflow/rules/*"]}

@@ -43,24 +43,30 @@ RUN apt-get update && apt-get install -y \
 # Install Rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs -y | sh
 
+# Install uv
+RUN pip install uv --break-system-packages
+
 # TODO: Move to uv Install uv
 #RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 # RUN pip install uv --break-system-packages
-#COPY --from=ghcr.io/astral-sh/uv:0.4.6 /uv /bin/uv
+# RUN uv init
+# RUN uv venv
+# RUN source .venv/bin/activate
+# #COPY --from=ghcr.io/astral-sh/uv:0.4.6 /uv /bin/uv
 
-# Set up Python virtual environment
-ENV VIRTUAL_ENV=/opt/venv
-RUN python3 -m venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+# # Set up Python virtual environment
+# ENV VIRTUAL_ENV=/opt/venv
+# RUN python3 -m venv $VIRTUAL_ENV
+# ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
 # Verify we're using the correct Python and pip
 # RUN which python3 && which pip
 
 # Copy requirements file
-COPY requirements.txt .
+# COPY requirements.txt .
 
 # Install Python packages
-RUN pip install --upgrade pip && pip install -r requirements.txt
+# RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # Set the working directory
 WORKDIR $TOOLS
@@ -183,16 +189,27 @@ ENV PATH=/:/usr/src/planter/planter:/tools/ntHits-ntHits-v0.0.1/:/tools/minimap2
 
 #################################################################################
 # Workflow and homemade scripts
-# Set up the working directory
+# Python environment setup with uv
 ENV APP_HOME=/usr/src/planter
-RUN mkdir -p $APP_HOME
 WORKDIR $APP_HOME
 
-# Copy necessary files
-#COPY setup.py setup.py
-#COPY planter planter
-#COPY setup.cfg setup.cfg
-COPY workflow workflow
+# Install uv properly
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
+# Create virtual environment
+ENV VIRTUAL_ENV=/opt/venv
+RUN uv venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Copy Python package files
+COPY pyproject.toml .
+COPY planter/ planter/
+# COPY workflow/ workflow/
+COPY requirements.txt .
+
+# Install dependencies and package
+RUN uv pip install -r requirements.txt
+RUN uv pip install -e .
+
+# Create necessary directories
 RUN mkdir -p $APP_HOME/inputs $APP_HOME/outputs
-
