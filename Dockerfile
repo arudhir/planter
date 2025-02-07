@@ -188,6 +188,12 @@ WORKDIR ${TOOLS}
 RUN wget https://mmseqs.com/latest/mmseqs-linux-avx2.tar.gz \
     && tar xvfz mmseqs-linux-avx2.tar.gz
 
+################
+#### seqkit ####
+################
+WORKDIR ${TOOLS}
+RUN wget https://github.com/shenwei356/seqkit/releases/download/v2.9.0/seqkit_linux_amd64.tar.gz \
+    && tar xvf seqkit_linux_amd64.tar.gz
 
 
 ### Set PATH and do some extraneous steps

@@ -79,17 +79,40 @@ rule get_qc_stats:
 
 storage:
     provider = "s3",
+    
 rule cluster_update:
     input:
         old_reps = storage.s3("s3://recombia.planter/repseq.faa"),
         pep = rules.transdecoder.output.longest_orfs_pep
     output:
-        repseq_faa = Path(config['outdir']) / '{sample}/cluster/update_{sample}/newRepSeqDB.fasta',
-        # Add other output files here
+        new_reps = Path(config['outdir']) / '{sample}/cluster/new_sequences.fasta',
+        removed_reps = Path(config['outdir']) / '{sample}/cluster/removed_sequences.fasta',
+        updated_repseq = Path(config['outdir']) / '{sample}/cluster/newRepSeqDB.fasta',
+        cluster_tsv = Path(config['outdir']) / '{sample}/cluster/newClusterDB.tsv',
     params:
         outdir = lambda wildcards: Path(config['outdir']) / f'{wildcards.sample}/cluster'
     shell:
-        './planter/scripts/mmseqs_cluster_update.py -i {input.old_reps} -o {params.outdir} {input.pep}'
+        """
+        ./planter/scripts/mmseqs_cluster_update.py \
+            -i {input.old_reps} \
+            -p {input.pep} \
+            -o {params.outdir} \
+            --output-new {output.new_reps} \
+            --output-removed {output.removed_reps}
+        """
+
+rule update_repseq:
+    input:
+        updated_repseq = rules.cluster_update.output.updated_repseq
+    output:
+        done_flag = Path(config['outdir']) / "{sample}_repseq_update_done.txt"  # ✅ Only track per-sample updates
+    params:
+        repseq_faa = "s3://recombia.planter/repseq.faa"  # ✅ Pass the S3 path as a param
+    shell:
+        """
+        aws s3 cp {input.updated_repseq} {params.repseq_faa}
+        touch {output.done_flag}
+        """
 
 rule create_duckdb:
     input:
