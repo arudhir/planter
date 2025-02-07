@@ -17,7 +17,7 @@ rule trinity:
         shell(
             'Trinity '
             '--seqType fq '
-            '--max_memory 25G '
+            '--max_memory 30G '
             '--output {output.trinity_outdir} '
             '--left {input.r1} '
             '--right {input.r2} '
@@ -30,7 +30,7 @@ rule rnaspades:
     output:
         fasta = Path(config['outdir']) / '{sample}/rnaspades/transcripts.fasta'
     params:
-        memory = 10,
+        memory = 20,
         rnaspades_outdir = directory(Path(config['outdir']) / '{sample}/rnaspades'),
     threads: workflow.cores / 2
     run:

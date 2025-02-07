@@ -1,8 +1,11 @@
+import os
 from pathlib import Path
 import shutil
 import hashlib
 import boto3
+import botocore
 import logging
+
 boto3.set_stream_logger(name='botocore', level=logging.INFO)
 
 def create_zip_archive(output_dir):
@@ -13,11 +16,6 @@ def create_zip_archive(output_dir):
     )
     return zip_archive
 
-
-import os
-import boto3
-import botocore
-from pathlib import Path
 
 def upload_to_s3(output_dir, sample, bucket):
     """
@@ -78,6 +76,21 @@ rule get_qc_stats:
             '--eggnog {input.eggnog} '
             '--output_file {output.qc_stats}'
         )
+
+storage:
+    provider = "s3",
+
+rule cluster_update:
+    input:
+        old_reps = storage.s3("s3://recombia.planter/repseq.faa"),
+        pep = rules.transdecoder.output.longest_orfs_pep
+    output:
+        repseq_faa = Path(config['outdir']) / '{sample}/cluster/update_{sample}/newRepSeqDB.fasta',
+        # Add other output files here
+    params:
+        outdir = lambda wildcards: Path(config['outdir']) / f'{wildcards.sample}/cluster'
+    shell:
+        './planter/scripts/mmseqs_cluster_update.py -i {input.old_reps} -o {params.outdir} {input.pep}'
 
 rule create_duckdb:
     input:

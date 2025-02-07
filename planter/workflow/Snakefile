@@ -22,4 +22,5 @@ rule all:
         expand(rules.quant.output, sample=samples),
         expand(rules.get_qc_stats.output, sample=samples),
         expand(rules.upload_to_s3.output, sample=samples),
-        expand(rules.create_duckdb.output, sample=samples)
+        expand(rules.create_duckdb.output, sample=samples),
+        expand(rules.cluster_update.output, sample=samples)

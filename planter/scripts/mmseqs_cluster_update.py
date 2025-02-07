@@ -106,7 +106,7 @@ class MMseqsClusterUpdater:
         self._extract_representative_sequences()
         
         # Step 6: Compare representatives
-        new_reps_added, reps_removed = self._compare_representatives()
+        # new_reps_added, reps_removed = self._compare_representatives()
         
         # Step 7: Generate updated alignments
         self._generate_alignments()
@@ -114,7 +114,7 @@ class MMseqsClusterUpdater:
         # Clean up
         self._cleanup()
         
-        return initial_clusters, updated_clusters, new_reps_added, reps_removed
+        return initial_clusters, updated_clusters#, new_reps_added, reps_removed
 
     def _run_initial_clustering(self, old_seqs: str) -> None:
         """Run initial clustering steps."""
@@ -315,14 +315,14 @@ class BatchMMseqsUpdater:
                 sys.exit(f"Could not extract SRR ID from filename: {filename}")
         return self.files
     
-    def _log_iteration_stats(self, iteration: int, srr_id: str, stats: Tuple[int, int, int, int]) -> None:
+    def _log_iteration_stats(self, iteration: int, srr_id: str, stats: Tuple[int, int]) -> None:
         """Log statistics for each iteration."""
-        initial, updated, added, removed = stats
+        initial, updated = stats
         logging.info(f"\nIteration {iteration} Statistics for {srr_id}:")
         logging.info(f"- Initial clusters: {initial}")
         logging.info(f"- Updated clusters: {updated}")
-        logging.info(f"- New representative sequences added: {added}")
-        logging.info(f"- Representative sequences removed: {removed}")
+        # logging.info(f"- New representative sequences added: {added}")
+        # logging.info(f"- Representative sequences removed: {removed}")
 
 
 def main():
