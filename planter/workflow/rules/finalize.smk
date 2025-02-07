@@ -79,7 +79,6 @@ rule get_qc_stats:
 
 storage:
     provider = "s3",
-
 rule cluster_update:
     input:
         old_reps = storage.s3("s3://recombia.planter/repseq.faa"),
