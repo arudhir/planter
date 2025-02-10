@@ -1,0 +1,32 @@
+Command line: /tools/SPAdes-4.0.0-Linux/bin/rnaspades.py	-1	/usr/src/planter/outputs/SRR12068547/illumina/processed/SRR12068547.1.fq.gz	-2	/usr/src/planter/outputs/SRR12068547/illumina/processed/SRR12068547.2.fq.gz	-o	/usr/src/planter/outputs/SRR12068547/rnaspades	--checkpoints	last	--threads	8	--memory	20	
+
+System information:
+  SPAdes version: 4.0.0
+  Python version: 3.12.3
+  OS: Linux-6.8.0-1017-aws-x86_64-with-glibc2.39
+
+Output dir: /usr/src/planter/outputs/SRR12068547/rnaspades
+Debug mode is turned OFF
+
+Dataset parameters:
+  RNA-seq mode
+  Reads:
+    Library number: 1, library type: paired-end
+      orientation: fr
+      left reads: ['/usr/src/planter/outputs/SRR12068547/illumina/processed/SRR12068547.1.fq.gz']
+      right reads: ['/usr/src/planter/outputs/SRR12068547/illumina/processed/SRR12068547.2.fq.gz']
+      interlaced reads: not specified
+      single reads: not specified
+      merged reads: not specified
+Assembly parameters:
+  k: automatic selection based on read length
+  Repeat resolution is enabled
+  Mismatch careful mode is turned OFF
+  MismatchCorrector will be SKIPPED
+  Coverage cutoff is turned OFF
+  Assembly graph output will use GFA v1.2 format
+Other parameters:
+  Dir for temp files: /usr/src/planter/outputs/SRR12068547/rnaspades/tmp
+  Threads: 8
+  Memory limit (in Gb): 20
+

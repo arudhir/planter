@@ -1,0 +1,7 @@
+- "left reads":
+  - "/usr/src/planter/outputs/SRR12068547/illumina/processed/SRR12068547.1.fq.gz"
+  "number": !!int "1"
+  "orientation": "fr"
+  "right reads":
+  - "/usr/src/planter/outputs/SRR12068547/illumina/processed/SRR12068547.2.fq.gz"
+  "type": "paired-end"

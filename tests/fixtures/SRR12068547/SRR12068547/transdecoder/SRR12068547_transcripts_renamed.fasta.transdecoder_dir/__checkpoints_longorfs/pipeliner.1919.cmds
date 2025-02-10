@@ -1,0 +1,1 @@
+/tools/TransDecoder-TransDecoder-v5.7.1/util/compute_base_probs.pl outputs/SRR12068547/rnaspades/SRR12068547_transcripts_renamed.fasta 0 > /usr/src/planter/outputs/SRR12068547/transdecoder/SRR12068547_transcripts_renamed.fasta.transdecoder_dir/base_freqs.dat

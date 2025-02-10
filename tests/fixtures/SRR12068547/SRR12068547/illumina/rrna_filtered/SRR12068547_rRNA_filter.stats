@@ -1,0 +1,6 @@
+#File	outputs/SRR12068547/illumina/fastp_raw/SRR12068547.1.fq.gz	outputs/SRR12068547/illumina/fastp_raw/SRR12068547.2.fq.gz
+#Reads	14926556
+#Mapped	858881
+#References	1
+#Name	Length	Scaffolds	Bases	Coverage	Reads	RPKM
+combined_rrna_ref	1021676027	605774	42558311	0.0417	858881	0.9788

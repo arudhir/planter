@@ -4,3 +4,4 @@ references/*
 .snakemake/*
 __pycache__
 */mmseqs_tmp
+tests/fixtures/**/*.fq.gz
