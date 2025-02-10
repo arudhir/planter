@@ -5,7 +5,7 @@ import hashlib
 import boto3
 import botocore
 import logging
-
+import ipdb
 boto3.set_stream_logger(name='botocore', level=logging.INFO)
 
 def create_zip_archive(output_dir):
@@ -77,20 +77,30 @@ rule get_qc_stats:
             '--output_file {output.qc_stats}'
         )
 
+# We need to wait until all of the proteins are done being made, then concatenate them and update the repseq.
+# This is a bit of a pain because we need to wait until all of the samples are done.
+# We can do this by adding a rule that waits for all of the samples to be done, then concatenates the proteins and updates the repseq.
+rule concatenate_peptides:
+    input:
+        peptides = expand(rules.transdecoder.output.longest_orfs_pep, sample=config['samples']),
+    output:
+        all_peptides = Path(config['outdir']) / 'all_peptides.fasta',
+    run:
+        shell('cat {input.peptides} > {output.all_peptides}')
+
 storage:
     provider = "s3",
-    
 rule cluster_update:
     input:
         old_reps = storage.s3("s3://recombia.planter/repseq.faa"),
-        pep = rules.transdecoder.output.longest_orfs_pep
+        pep = rules.concatenate_peptides.output.all_peptides
     output:
-        new_reps = Path(config['outdir']) / '{sample}/cluster/new_sequences.fasta',
-        removed_reps = Path(config['outdir']) / '{sample}/cluster/removed_sequences.fasta',
-        updated_repseq = Path(config['outdir']) / '{sample}/cluster/newRepSeqDB.fasta',
-        cluster_tsv = Path(config['outdir']) / '{sample}/cluster/newClusterDB.tsv',
+        new_reps = Path(config['outdir']) / 'cluster/new_sequences.fasta',
+        removed_reps = Path(config['outdir']) / 'cluster/removed_sequences.fasta',
+        updated_repseq = Path(config['outdir']) / 'cluster/newRepSeqDB.fasta',
+        cluster_tsv = Path(config['outdir']) / 'cluster/newClusterDB.tsv',
     params:
-        outdir = lambda wildcards: Path(config['outdir']) / f'{wildcards.sample}/cluster'
+        outdir = lambda wildcards: Path(config['outdir']) / 'cluster'
     shell:
         """
         ./planter/scripts/mmseqs_cluster_update.py \
@@ -101,13 +111,16 @@ rule cluster_update:
             --output-removed {output.removed_reps}
         """
 
+
+# This doesn't handle the case where several samples are run in parallel.
+# We need to track per-sample updates or do it in batch.
 rule update_repseq:
     input:
         updated_repseq = rules.cluster_update.output.updated_repseq
     output:
-        done_flag = Path(config['outdir']) / "{sample}_repseq_update_done.txt"  # ✅ Only track per-sample updates
+        done_flag = Path(config['outdir']) / 'cluster/repseq_update_done.txt'  # ✅ Only track per-sample updates
     params:
-        repseq_faa = "s3://recombia.planter/repseq.faa"  # ✅ Pass the S3 path as a param
+        repseq_faa = storage.s3("s3://recombia.planter/repseq.faa")  # ✅ Pass the S3 path as a param
     shell:
         """
         aws s3 cp {input.updated_repseq} {params.repseq_faa}

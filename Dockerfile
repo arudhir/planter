@@ -228,3 +228,5 @@ RUN uv pip install -e .
 
 # Create necessary directories
 RUN mkdir -p $APP_HOME/inputs $APP_HOME/outputs
+
+COPY .snakemake .snakemake

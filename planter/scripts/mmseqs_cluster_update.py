@@ -78,12 +78,12 @@ class MMseqsClusterUpdater:
         logging.info(f"Running command: {' '.join(cmd)}")
         with open(log_file, 'a') as lf:
             lf.write(f"Running command: {' '.join(cmd)}\n")
-            process = subprocess.Popen(cmd, stdout=lf, stderr=lf, shell=isinstance(cmd, str))
+            process = subprocess.Popen(cmd, stdout=lf, stderr=lf)
             process.communicate()
             if process.returncode != 0:
                 sys.exit(f"Command failed: {' '.join(cmd)}")
 
-    def update_clusters(self, old_seqs: str, new_seqs: str, output_new: str, output_removed: str) -> Tuple[int, int, int, int]:
+    def update_clusters(self, old_seqs: str, new_seqs: str) -> Tuple[int, int, int, int]:
         """
         Run the complete MMseqs2 clustering update pipeline.
         Returns tuple of (initial_clusters, updated_clusters, new_reps_added, reps_removed)
@@ -106,7 +106,7 @@ class MMseqsClusterUpdater:
         self._extract_representative_sequences()
         
         # Step 6: Compare representatives
-        new_reps_added, reps_removed = self._compare_representatives(output_new, output_removed)
+        new_reps_added, reps_removed = self._compare_representatives()
         
         # Step 7: Generate updated alignments
         self._generate_alignments()
@@ -194,37 +194,30 @@ class MMseqsClusterUpdater:
             os.path.join(self.output_dir, 'newRepSeqDB.fasta')
         ])
 
-    def _compare_representatives(self, output_new: str, output_removed: str) -> Tuple[int, int]:
-        """Compare initial and updated representative sequences using seqkit and save outputs."""
-        logging.info("Step 6: Comparing representatives using seqkit.")
+    def _compare_representatives(self) -> Tuple[int, int]:
+        """Compare initial and updated representative sequences using seqkit."""
+        logging.info("Step 6: Comparing representatives.")
 
-        original_reps = os.path.join(self.output_dir, 'original_reps.txt')
-        updated_reps = os.path.join(self.output_dir, 'updated_reps.txt')
-
-        # Ensure the expected directory exists
-        os.makedirs(os.path.dirname(output_new), exist_ok=True)
-        os.makedirs(os.path.dirname(output_removed), exist_ok=True)
-
-        # Extract headers using seqkit
-        self.run_command(['seqkit', 'seq', '-n', os.path.join(self.output_dir, 'repSeqDB.fasta'), '-o', original_reps])
-        self.run_command(['seqkit', 'seq', '-n', os.path.join(self.output_dir, 'newRepSeqDB.fasta'), '-o', updated_reps])
+        original_fasta = os.path.join(self.output_dir, 'repSeqDB.fasta')
+        updated_fasta = os.path.join(self.output_dir, 'newRepSeqDB.fasta')
 
         try:
-            # Save new sequences
-            self.run_command(f"bash -c 'comm -13 <(sort {original_reps}) <(sort {updated_reps}) > {output_new}'")
-            # Save removed sequences
-            self.run_command(f"bash -c 'comm -23 <(sort {original_reps}) <(sort {updated_reps}) > {output_removed}'")
+            new_added = int(subprocess.check_output(
+                f"seqkit seq -n {original_fasta} | sort | comm -13 - <(seqkit seq -n {updated_fasta} | sort) | wc -l",
+                shell=True, executable="/bin/bash"
+            ).decode().strip())
 
-            new_added = sum(1 for _ in open(output_new))
-            removed = sum(1 for _ in open(output_removed))
-
-            logging.info(f"New representative sequences added: {new_added}")
-            logging.info(f"Representative sequences removed: {removed}")
+            removed = int(subprocess.check_output(
+                f"seqkit seq -n {updated_fasta} | sort | comm -23 - <(seqkit seq -n {original_fasta} | sort) | wc -l",
+                shell=True, executable="/bin/bash"
+            ).decode().strip())
 
             return new_added, removed
+
         except subprocess.CalledProcessError as e:
             logging.error(f"Error comparing representative sequences: {e.output.decode()}")
             return 0, 0
+
 
     def _generate_alignments(self) -> None:
         """Generate alignments for updated clusters."""
@@ -305,17 +298,22 @@ class BatchMMseqsUpdater:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="MMseqs2 clustering update tool")
-    parser.add_argument('-i', '--input-old', required=True, help='Old representative sequences file')
-    parser.add_argument('-p', '--input-new', required=True, help='New protein sequences file')
-    parser.add_argument('-o', '--output-dir', required=True, help='Output directory')
-    parser.add_argument('--output-new', required=True, help='Output file for newly added sequences')
-    parser.add_argument('--output-removed', required=True, help='Output file for removed sequences')
-
+    parser = argparse.ArgumentParser(description="Batch MMseqs2 clustering update tool")
+    parser.add_argument('files', nargs='+',
+                       help='One or more input files to process')
+    parser.add_argument('-o', '--output-dir', required=True,
+                       help='Base output directory')
+    parser.add_argument('-i', '--initial-reps', default='',
+                       help='Initial old representative sequences file')
     args = parser.parse_args()
     
-    updater = MMseqsClusterUpdater(args.output_dir)
-    updater.update_clusters(args.input_old, args.input_new, args.output_new, args.output_removed)
+    batch_updater = BatchMMseqsUpdater(
+        files=args.files,
+        base_output_dir=args.output_dir,
+        initial_reps=args.initial_reps
+    )
+    batch_updater.process_files()
+
 
 if __name__ == '__main__':
     main()

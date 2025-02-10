@@ -1,1 +1,0 @@
-/opt/TransDecoder-TransDecoder-v5.7.0/util/compute_base_probs.pl sample_trinity.Trinity.fasta 0 > /home/ubuntu/transXpress2/tests/sample_trinity.Trinity.fasta.transdecoder_dir/base_freqs.dat
