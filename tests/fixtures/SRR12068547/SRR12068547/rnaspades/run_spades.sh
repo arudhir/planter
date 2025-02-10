@@ -1,8 +1,3 @@
-set -e
-true
-true
-/tools/SPAdes-4.0.0-Linux/bin/spades-core /usr/src/planter/outputs/SRR12068547/rnaspades/K29/configs/config.info /usr/src/planter/outputs/SRR12068547/rnaspades/K29/configs/mda_mode.info /usr/src/planter/outputs/SRR12068547/rnaspades/K29/configs/rna_mode.info
-/opt/venv/bin/python3 /tools/SPAdes-4.0.0-Linux/share/spades/spades_pipeline/scripts/copy_files.py /usr/src/planter/outputs/SRR12068547/rnaspades/K29/before_rr.fasta /usr/src/planter/outputs/SRR12068547/rnaspades/before_rr.fasta /usr/src/planter/outputs/SRR12068547/rnaspades/K29/assembly_graph_after_simplification.gfa /usr/src/planter/outputs/SRR12068547/rnaspades/assembly_graph_after_simplification.gfa /usr/src/planter/outputs/SRR12068547/rnaspades/K29/transcripts.fasta /usr/src/planter/outputs/SRR12068547/rnaspades/transcripts.fasta /usr/src/planter/outputs/SRR12068547/rnaspades/K29/transcripts.paths /usr/src/planter/outputs/SRR12068547/rnaspades/transcripts.paths /usr/src/planter/outputs/SRR12068547/rnaspades/K29/assembly_graph_with_scaffolds.gfa /usr/src/planter/outputs/SRR12068547/rnaspades/assembly_graph_with_scaffolds.gfa /usr/src/planter/outputs/SRR12068547/rnaspades/K29/assembly_graph.fastg /usr/src/planter/outputs/SRR12068547/rnaspades/assembly_graph.fastg /usr/src/planter/outputs/SRR12068547/rnaspades/K29/hard_filtered_final_paths.fasta /usr/src/planter/outputs/SRR12068547/rnaspades/hard_filtered_transcripts.fasta /usr/src/planter/outputs/SRR12068547/rnaspades/K29/soft_filtered_final_paths.fasta /usr/src/planter/outputs/SRR12068547/rnaspades/soft_filtered_transcripts.fasta
-true
-/opt/venv/bin/python3 /tools/SPAdes-4.0.0-Linux/share/spades/spades_pipeline/scripts/breaking_scaffolds_script.py --result_scaffolds_filename /usr/src/planter/outputs/SRR12068547/rnaspades/scaffolds.fasta --misc_dir /usr/src/planter/outputs/SRR12068547/rnaspades/misc --threshold_for_breaking_scaffolds 3
-true
+version https://git-lfs.github.com/spec/v1
+oid sha256:ef81fbc9cfc9be4e436a93096f28cbabde3e6bd5499505817be566aa3e76acf9
+size 1896

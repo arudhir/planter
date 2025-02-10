@@ -1,16 +1,3 @@
-{
-    "sample": "SRR12068547",
-    "organism": "Mesoplasma florum",
-    "Number of Orthologs": 251,
-    "Number of Secondary Metabolite Genes": 2,
-    "Percent Mapped": 97.08,
-    "Number of Reads Mapped": 6791020.0,
-    "Total Reads (Before)": 16089680,
-    "Total Reads (After)": 14926556,
-    "Sequencing Type": "paired end (50 cycles + 50 cycles)",
-    "Number of Transcripts": 3909,
-    "Total Assembly Length": 1594989,
-    "N50": 380,
-    "ExN50": 273,
-    "Average Expression (TPM)": 255.82
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:5e60dae6da943fc7ff25b2d6df6de6ef1f14592523f1536546dea64ae19d6209
+size 500

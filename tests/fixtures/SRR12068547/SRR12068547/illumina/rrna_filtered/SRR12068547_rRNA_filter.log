@@ -1,22 +1,3 @@
-java -Djava.library.path=/tools/bbmap/jni/ -ea -Xmx5g -Xms5g -cp /tools/bbmap/current/ jgi.BBDukF in1=outputs/SRR12068547/illumina/fastp_raw/SRR12068547.1.fq.gz in2=outputs/SRR12068547/illumina/fastp_raw/SRR12068547.2.fq.gz out=outputs/SRR12068547/illumina/rrna_filtered/SRR12068547.1.fq.gz out2=outputs/SRR12068547/illumina/rrna_filtered/SRR12068547.2.fq.gz refstats=outputs/SRR12068547/illumina/rrna_filtered/SRR12068547_rRNA_filter.stats ref=references/combined_rrna_ref.fasta k=31 -Xmx5g
-Executing jgi.BBDukF [in1=outputs/SRR12068547/illumina/fastp_raw/SRR12068547.1.fq.gz, in2=outputs/SRR12068547/illumina/fastp_raw/SRR12068547.2.fq.gz, out=outputs/SRR12068547/illumina/rrna_filtered/SRR12068547.1.fq.gz, out2=outputs/SRR12068547/illumina/rrna_filtered/SRR12068547.2.fq.gz, refstats=outputs/SRR12068547/illumina/rrna_filtered/SRR12068547_rRNA_filter.stats, ref=references/combined_rrna_ref.fasta, k=31, -Xmx5g]
-
-BBDuk version 37.41
-Initial:
-Memory: max=5368m, free=5347m, used=21m
-
-Added 122969192 kmers; time: 	27.882 seconds.
-Memory: max=5368m, free=2406m, used=2962m
-
-Input is being processed as paired
-Started output streams:	0.022 seconds.
-Processing time:   		9.098 seconds.
-
-Input:                  	14926556 reads 		745651066 bases.
-Contaminants:           	935536 reads (6.27%) 	46368396 bases (6.22%)
-Total Removed:          	935536 reads (6.27%) 	46368396 bases (6.22%)
-Result:                 	13991020 reads (93.73%) 	699282670 bases (93.78%)
-
-Time:   			37.037 seconds.
-Reads Processed:      14926k 	403.01k reads/sec
-Bases Processed:        745m 	20.13m bases/sec
+version https://git-lfs.github.com/spec/v1
+oid sha256:e22a5449ac733184f320c71990d762c14fa5b21e0718477d8eefe2b528d958d1
+size 1584

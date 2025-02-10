@@ -1,4 +1,3 @@
-mode isolate
-
-#include "careful_mode.info"
-
+version https://git-lfs.github.com/spec/v1
+oid sha256:38f1c362de9b29f7129cb35b751c078b4015a2d90669699815646a7a96ed3b6f
+size 44

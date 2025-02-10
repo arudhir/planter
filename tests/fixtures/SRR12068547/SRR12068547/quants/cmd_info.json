@@ -1,12 +1,3 @@
-{
-    "salmon_version": "1.10.2",
-    "index": "outputs/SRR12068547/salmon_index",
-    "libType": "A",
-    "mates1": "outputs/SRR12068547/illumina/rrna_filtered/SRR12068547.1.fq.gz",
-    "mates2": "outputs/SRR12068547/illumina/rrna_filtered/SRR12068547.2.fq.gz",
-    "output": "outputs/SRR12068547/quants",
-    "threads": "8",
-    "writeUnmappedNames": [],
-    "minAssignedFrags": "1",
-    "auxDir": "aux_info"
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:948c1db5b129c79f12348461130f9dcc98115cbc9f0742d79e9a115c836ebd0a
+size 412

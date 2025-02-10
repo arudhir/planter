@@ -1,11 +1,3 @@
-;FIXME do we still need this mode?
-mode large_genome
-
-pe {
-
-debug_output false
-
-params {
-    scaffolding_mode old_pe_2015
-}
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:5178e680f7d6ad171f37264b5145dd4181d84d7e504261fbdf7f9c594fd8a780
+size 126

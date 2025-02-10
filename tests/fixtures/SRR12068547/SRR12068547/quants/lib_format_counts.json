@@ -1,22 +1,3 @@
-{
-    "read_files": "[ outputs/SRR12068547/illumina/rrna_filtered/SRR12068547.1.fq.gz, outputs/SRR12068547/illumina/rrna_filtered/SRR12068547.2.fq.gz]",
-    "expected_format": "IU",
-    "compatible_fragment_ratio": 1.0,
-    "num_compatible_fragments": 6791020,
-    "num_assigned_fragments": 6791020,
-    "num_frags_with_concordant_consistent_mappings": 4405573,
-    "num_frags_with_inconsistent_or_orphan_mappings": 5141888,
-    "strand_mapping_bias": 0.42167613611214707,
-    "MSF": 0,
-    "OSF": 0,
-    "ISF": 1857725,
-    "MSR": 0,
-    "OSR": 0,
-    "ISR": 2547848,
-    "SF": 2401940,
-    "SR": 2739948,
-    "MU": 0,
-    "OU": 0,
-    "IU": 0,
-    "U": 0
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:2e0ea3db2566a2068538073149711c2a9ba1f35e67032b30be43c12c3bdb5254
+size 658

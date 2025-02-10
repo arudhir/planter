@@ -1,6 +1,3 @@
-hmm_match {
-  set_of_hmms none
-  component_size_part 10
-  start_only_from_tips false
-  set_copynumber false
-}
+version https://git-lfs.github.com/spec/v1
+oid sha256:9701b8baa14340c9a2b13d6637862ca78254eda94600c13a0e243e97157d9aed
+size 110
