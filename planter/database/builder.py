@@ -232,6 +232,7 @@ class SequenceDBBuilder:
                 'sample_id': sample_id,
                 'assembly_date': datetime.now(),
                 'is_representative': False,
+                'repseq_id': seqhash_id,  # initialize the repseq_id to be the same as seqhash_id
                 'length': len(record.seq)
             })
             sequences_loaded += 1

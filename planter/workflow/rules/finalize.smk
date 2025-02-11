@@ -80,52 +80,134 @@ rule get_qc_stats:
 # We need to wait until all of the proteins are done being made, then concatenate them and update the repseq.
 # This is a bit of a pain because we need to wait until all of the samples are done.
 # We can do this by adding a rule that waits for all of the samples to be done, then concatenates the proteins and updates the repseq.
-rule concatenate_peptides:
-    input:
-        peptides = expand(rules.transdecoder.output.longest_orfs_pep, sample=config['samples']),
-    output:
-        all_peptides = Path(config['outdir']) / 'all_peptides.fasta',
-    run:
-        shell('cat {input.peptides} > {output.all_peptides}')
+# rule concatenate_peptides:
+#     input:
+#         peptides = expand(rules.transdecoder.output.longest_orfs_pep, sample=config['samples']),
+#     output:
+#         all_peptides = Path(config['outdir']) / 'all_peptides.fasta',
+#     run:
+#         shell('cat {input.peptides} > {output.all_peptides}')
 
 storage:
     provider = "s3",
-rule cluster_update:
-    input:
-        old_reps = storage.s3("s3://recombia.planter/repseq.faa"),
-        pep = rules.concatenate_peptides.output.all_peptides
-    output:
-        new_reps = Path(config['outdir']) / 'cluster/new_sequences.fasta',
-        removed_reps = Path(config['outdir']) / 'cluster/removed_sequences.fasta',
-        updated_repseq = Path(config['outdir']) / 'cluster/newRepSeqDB.fasta',
-        cluster_tsv = Path(config['outdir']) / 'cluster/newClusterDB.tsv',
-    params:
-        outdir = lambda wildcards: Path(config['outdir']) / 'cluster'
-    shell:
-        """
-        ./planter/scripts/mmseqs_cluster_update.py \
-            -i {input.old_reps} \
-            -p {input.pep} \
-            -o {params.outdir} \
-            --output-new {output.new_reps} \
-            --output-removed {output.removed_reps}
-        """
+storage:
+    provider = "s3",
 
-
-# This doesn't handle the case where several samples are run in parallel.
-# We need to track per-sample updates or do it in batch.
-rule update_repseq:
+rule batch_cluster_update:
+    """
+    Batch cluster update:
+    
+    Concatenate all samples' peptide files, run mmseqs_cluster_update.py
+    to update the canonical repseq FASTA, upload it to S3, and create a
+    single done flag.
+    """
     input:
-        updated_repseq = rules.cluster_update.output.updated_repseq
+        # The current canonical repseq downloaded from S3.
+        old_repseq = storage.s3("s3://recombia.planter/repseq.faa"),
+        # Peptide files for all samples in the batch.
+        pep = expand("{outdir}/{sample}/transdecoder/{sample}.pep",
+                     outdir=config["outdir"],
+                     sample=config["samples"])
     output:
-        done_flag = Path(config['outdir']) / 'cluster/repseq_update_done.txt'  # ✅ Only track per-sample updates
+        # Final updated repseq file.
+        final_repseq = Path(config["outdir"]) / "cluster" / "repseq.faa",
+        # The new cluster TSV file (if your script produces it)
+        cluster_tsv  = Path(config["outdir"]) / "cluster" / "newClusterDB.tsv",
+        # A single done flag file.
+        done = Path(config["outdir"]) / "cluster" / "repseq_update_done.txt"
     params:
-        repseq_faa = storage.s3("s3://recombia.planter/repseq.faa")  # ✅ Pass the S3 path as a param
-    shell:
-        """
-        aws s3 cp {input.updated_repseq} {params.repseq_faa}
-        touch {output.done_flag}
-        """
+        # Use a dedicated temporary subdirectory inside the cluster folder.
+        cluster_dir = Path(config["outdir"]) / "cluster",
+        tmp_dir = Path(config["outdir"]) / "cluster" / "tmp",
+        # The canonical repseq S3 URI.
+        repseq_s3 = "s3://recombia.planter/repseq.faa"
+    threads: workflow.cores
+    run:
+        shell(
+            r"""
+            set -e  # Exit immediately if any command fails.
+            
+            # Ensure the cluster output directory and temporary subdirectory exist.
+            mkdir -p {params.cluster_dir}
+            rm -rf {params.tmp_dir}
+            mkdir -p {params.tmp_dir}
+            
+            # Concatenate all peptide files into a temporary aggregated file.
+            cat {input.pep} > {params.tmp_dir}/all_new.pep
+            
+            # Run the mmseqs cluster update script.
+            # This script reads the current repseq (-i {input.old_repseq}),
+            # uses the aggregated peptides from {params.tmp_dir}/all_new.pep,
+            # and writes its updated repseq to {params.tmp_dir}/newRepSeqDB.fasta.
+            python ./planter/scripts/mmseqs_cluster_update.py -i {input.old_repseq} -o {params.tmp_dir} {params.tmp_dir}/all_new.pep
+            
+            # Copy the updated repseq produced by mmseqs_cluster_update.py to the final output location.
+            cp {params.tmp_dir}/newRepSeqDB.fasta {output.final_repseq}
+            
+            # Optionally, copy the cluster TSV file if your script produces it.
+            if [ -f {params.tmp_dir}/newClusterDB.tsv ]; then
+                cp {params.tmp_dir}/newClusterDB.tsv {output.cluster_tsv}
+            fi
+            
+            # Upload the final repseq to S3.
+            aws s3 cp {output.final_repseq} {params.repseq_s3}
+            
+            # Clean up the temporary directory.
+            rm -rf {params.tmp_dir}
+            
+            # Touch the done flag.
+            touch {output.done}
+            """
+        )
+# rule cluster_update:
+#     input:
+#         old_reps = storage.s3("s3://recombia.planter/repseq.faa"),
+#         pep = rules.transdecoder.output.longest_orfs_pep
+#     output:
+#         new_repseq = Path(config['outdir']) / '{sample}/cluster/newRepSeqDB.fasta',
+#         cluster_tsv = Path(config['outdir']) / '{sample}/cluster/newClusterDB.tsv',
+#     params:
+#         outdir = lambda wildcards: Path(config['outdir']) / f'{wildcards.sample}/cluster'
+#     threads: workflow.cores
+#     run:
+#         shell(
+#             """
+#             ./planter/scripts/mmseqs_cluster_update.py \
+#                 -i {input.old_reps} \
+#                 -o {params.outdir} \
+#                 {input.pep}
+#             """
+#         )
+
+# rule update_repseq:
+#     input:
+#         new_repseq = rules.cluster_update.output.new_repseq
+#     output:
+#         done_flag = Path(config['outdir']) / '{sample}/cluster/repseq_update_done.txt'
+#     params:
+#         repseq_faa = "s3://recombia.planter/repseq.faa"  # Use the S3 URI directly
+#     resources:
+#         repseq_update=1
+#     shell:
+#         """
+#         aws s3 cp {input.new_repseq} {params.repseq_faa}
+#         touch {output.done_flag}
+#         """
+
+# # This doesn't handle the case where several samples are run in parallel.
+# # We need to track per-sample updates or do it in batch.
+# rule update_repseq:
+#     input:
+#         updated_repseq = rules.cluster_update.output.updated_repseq
+#     output:
+#         done_flag = Path(config['outdir']) / 'cluster/repseq_update_done.txt'  # ✅ Only track per-sample updates
+#     params:
+#         repseq_faa = storage.s3("s3://recombia.planter/repseq.faa")  # ✅ Pass the S3 path as a param
+#     shell:
+#         """
+#         aws s3 cp {input.updated_repseq} {params.repseq_faa}
+#         touch {output.done_flag}
+#         """
 
 rule create_duckdb:
     input:
