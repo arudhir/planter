@@ -267,7 +267,7 @@ class BatchMMseqsUpdater:
         for i, file in enumerate(files, start=1):
             srr_id = self._get_srr_id(file)
             # output_dir = os.path.join(self.base_output_dir, f"update_{srr_id}")
-            output_dir = self.base_output_dir
+            output_dir = self.base_output_dir + f'_{i}'
             logging.info(f"\nProcessing file {i}/{len(files)}: {srr_id}")
             
             updater = MMseqsClusterUpdater(output_dir)
