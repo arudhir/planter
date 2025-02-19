@@ -184,45 +184,100 @@ def merge_duckdbs(
     print("All databases have been merged into:", master_db_path)
     return master_db_path
 
-def update_duckdb_with_cluster_info(master_db_path: str, tsv_path: str, inplace=False):
+def update_duckdb_with_cluster_info(db_path: str, tsv_path: str):
     """
-    Update the 'sequences' table in the master DuckDB using a cluster mapping TSV.
-    
+    Updates a DuckDB database with clustering information from an MMSeqs2 TSV file.
+
     Parameters:
-        master_db_path (str): Path to the master DuckDB file.
-        tsv_path (str): Path to the TSV file containing cluster mappings.
-                        The TSV should have two columns (no header):
-                          - Column 0: repseq_id (the representative seqhash)
-                          - Column 1: seqhash_id (the member seqhash)
-                          
-    The function updates the 'repseq_id' column in the 'sequences' table such that
-    for every row where sequences.seqhash_id matches the TSV's member, repseq_id is set
-    to the TSV's repseq_id. It also sets is_representative to TRUE for sequences that are representatives.
+    - db_path (str): Path to the DuckDB database file.
+    - tsv_path (str): Path to the MMSeqs2 TSV file containing clustering data.
     """
-    print(f"Updating master DB with cluster info from {tsv_path}")
-    # Connect to the master DuckDB.
-    con = duckdb.connect(master_db_path)
     
-    # Create a temporary table by reading the TSV file.
-    # We assume the TSV has no header and uses tab as the separator.
-    con.execute(f"""
-    CREATE TEMPORARY TABLE new_clusters AS 
-      SELECT * FROM read_csv_auto('{tsv_path}', header=False, sep='\t', names=['repseq_id', 'seqhash_id'])
-      AS (repseq_id VARCHAR, seqhash_id VARCHAR);
-    """)
-    
-    # # Optionally, update the is_representative flag.
-    # # For every sequence that appears as a repseq_id in the new_clusters table, mark it as representative.
+    # Load the MMSeqs2 TSV into a DataFrame
+    df = pd.read_csv(tsv_path, sep="\t", names=["representative_seqhash_id", "seqhash_id"])
+    df = df.drop_duplicates()
+    # Connect to DuckDB
+    con = duckdb.connect(db_path)
+
+    # Create a temporary table for the MMSeqs2 data
     con.execute("""
-    UPDATE sequences
-    SET is_representative = TRUE
-    WHERE seqhash_id IN (
-        SELECT DISTINCT repseq_id FROM new_clusters
-    );
+        CREATE TEMPORARY TABLE mmseqs2_clusters (
+            representative_seqhash_id VARCHAR,
+            seqhash_id VARCHAR
+        )
     """)
-    
+
+    # Insert data into the temporary table
+    con.executemany("INSERT INTO mmseqs2_clusters VALUES (?, ?)", df.values.tolist())
+
+    # Update the sequences table to assign the representative sequence
+    con.execute("""
+        UPDATE sequences 
+        SET repseq_id = mm.representative_seqhash_id
+        FROM mmseqs2_clusters mm
+        WHERE sequences.seqhash_id = mm.seqhash_id
+    """)
+
+    # Insert new clusters into the clusters table if they don't exist
+    con.execute("""
+        INSERT INTO clusters (cluster_id, representative_seqhash_id, size)
+        SELECT representative_seqhash_id, representative_seqhash_id, COUNT(*)
+        FROM mmseqs2_clusters
+        GROUP BY representative_seqhash_id
+        ON CONFLICT (cluster_id) DO NOTHING
+    """)
+
+    # Insert cluster memberships into the cluster_members table
+    con.execute("""
+        INSERT INTO cluster_members (seqhash_id, cluster_id)
+        SELECT seqhash_id, representative_seqhash_id FROM mmseqs2_clusters
+        ON CONFLICT (seqhash_id) DO NOTHING
+    """)
+
+    # Close the connection
     con.close()
-    print("Master DB updated using cluster mapping.")
+
+    print(f"Database '{db_path}' successfully updated with MMSeqs2 clustering information.")
+
+# def update_duckdb_with_cluster_info(master_db_path: str, tsv_path: str, inplace=False):
+#     """
+#     Update the 'sequences' table in the master DuckDB using a cluster mapping TSV.
+    
+#     Parameters:
+#         master_db_path (str): Path to the master DuckDB file.
+#         tsv_path (str): Path to the TSV file containing cluster mappings.
+#                         The TSV should have two columns (no header):
+#                           - Column 0: repseq_id (the representative seqhash)
+#                           - Column 1: seqhash_id (the member seqhash)
+                          
+#     The function updates the 'repseq_id' column in the 'sequences' table such that
+#     for every row where sequences.seqhash_id matches the TSV's member, repseq_id is set
+#     to the TSV's repseq_id. It also sets is_representative to TRUE for sequences that are representatives.
+#     """
+#     print(f"Updating master DB with cluster info from {tsv_path}")
+#     # Connect to the master DuckDB.
+#     con = duckdb.connect(master_db_path)
+    
+#     # Create a temporary table by reading the TSV file.
+#     # We assume the TSV has no header and uses tab as the separator.
+#     con.execute(f"""
+#     CREATE TEMPORARY TABLE new_clusters AS 
+#       SELECT * FROM read_csv_auto('{tsv_path}', header=False, sep='\t', names=['repseq_id', 'seqhash_id'])
+#       AS (repseq_id VARCHAR, seqhash_id VARCHAR);
+#     """)
+    
+#     # # Optionally, update the is_representative flag.
+#     # # For every sequence that appears as a repseq_id in the new_clusters table, mark it as representative.
+#     con.execute("""
+#     UPDATE sequences
+#     SET is_representative = TRUE
+#     WHERE seqhash_id IN (
+#         SELECT DISTINCT repseq_id FROM new_clusters
+#     );
+#     """)
+    
+#     con.close()
+#     print("Master DB updated using cluster mapping.")
 
 
 
