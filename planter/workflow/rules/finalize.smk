@@ -9,6 +9,7 @@ import ipdb
 import urllib3
 import duckdb
 from typing import List, Union
+import pandas as pd 
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 boto3.set_stream_logger(name='botocore', level=logging.INFO)
