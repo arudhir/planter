@@ -1,0 +1,26 @@
+[
+  {
+    "Name": "v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c",
+    "Length": 5415,
+    "EffectiveLength": 5125.11,
+    "TPM": 3.762602,
+    "NumReads": 1670.012,
+    "sample": "SRR12068547"
+  },
+  {
+    "Name": "v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace",
+    "Length": 2485,
+    "EffectiveLength": 2195.11,
+    "TPM": 614.765489,
+    "NumReads": 116867.548,
+    "sample": "SRR12068547"
+  },
+  {
+    "Name": "v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf",
+    "Length": 2114,
+    "EffectiveLength": 1824.11,
+    "TPM": 654.468328,
+    "NumReads": 103387.45,
+    "sample": "SRR12068547"
+  }
+]

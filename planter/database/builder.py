@@ -45,29 +45,33 @@ class SequenceDBBuilder:
         if self.con:
             self.con.close()
 
-    # @contextmanager
-    # def transaction(self):
-    #     """Context manager for database transactions"""
-    #     try:
-    #         self.con.execute("BEGIN")
-    #         yield
-    #         self.con.execute("COMMIT")
-    #     except Exception as e:
-    #         self.con.execute("ROLLBACK")
-    #         self.logger.error(f"Transaction failed: {str(e)}")
-    #         raise
+    # Keep track of transaction nesting
+    _transaction_level = 0
+    
+    @contextmanager
+    def transaction(self):
+        """Context manager for database transactions that supports nesting"""
+        is_outermost = self._transaction_level == 0
+        self._transaction_level += 1
+        
+        try:
+            if is_outermost:
+                self.con.execute("BEGIN")
+            yield
+            if is_outermost:
+                self.con.execute("COMMIT")
+        except Exception as e:
+            if is_outermost:
+                self.con.execute("ROLLBACK")
+            self.logger.error(f"Transaction failed: {str(e)}")
+            raise
+        finally:
+            self._transaction_level -= 1
 
     def execute_transaction(self, func, *args, **kwargs):
         """Execute a function within a transaction"""
-        try:
-            self.con.execute("BEGIN")
-            result = func(*args, **kwargs)
-            self.con.execute("COMMIT")
-            return result
-        except Exception as e:
-            self.con.execute("ROLLBACK")
-            self.logger.error(f"Transaction failed: {str(e)}")
-            raise
+        with self.transaction():
+            return func(*args, **kwargs)
     
     def _init_version_tracking(self):
         """Initialize schema version tracking"""
@@ -111,24 +115,9 @@ class SequenceDBBuilder:
     def init_database(self):
         """Initialize database with clean schema from migration files"""
         # Clean database first
-        self.con.execute("""
-            DROP TABLE IF EXISTS schema_version;
-            DROP TABLE IF EXISTS cluster_members;
-            DROP TABLE IF EXISTS clusters;
-            DROP TABLE IF EXISTS kegg_info;
-            DROP TABLE IF EXISTS ec_numbers;
-            DROP TABLE IF EXISTS go_terms;
-            DROP TABLE IF EXISTS annotations;
-            DROP TABLE IF EXISTS expression;
-            DROP TABLE IF EXISTS sequences;
-            DROP TABLE IF EXISTS sra_metadata;
-            DROP TABLE IF EXISTS temp_annotations;
-            DROP TABLE IF EXISTS temp_clusters;
-        """)
+        self.clean_database()
         
-        try:
-            self.con.execute("BEGIN")
-            
+        with self.transaction():
             # Create version tracking
             self.con.execute("""
                 CREATE TABLE IF NOT EXISTS schema_version (
@@ -158,12 +147,6 @@ class SequenceDBBuilder:
                             ?
                         )
                     """, [migration_file.name])
-            
-            self.con.execute("COMMIT")
-            
-        except Exception as e:
-            self.con.execute("ROLLBACK")
-            raise
 
     def _get_sample_paths(self, sample_id: str) -> SamplePaths:
         """Get paths to sample data files."""
@@ -426,22 +409,64 @@ class SequenceDBBuilder:
             return 0
             
         try:
+            # First, try to validate the JSON file by loading it with pandas
+            try:
+                import pandas as pd
+                import json
+                with open(expression_path, 'r') as f:
+                    data = json.load(f)
+                    self.logger.info(f"Verified JSON file format: {len(data)} records")
+                
+                # Debug log the first few entries to understand structure
+                if len(data) > 0:
+                    self.logger.info(f"First entry structure: {data[0].keys()}")
+            except Exception as e:
+                self.logger.error(f"Error validating JSON file: {e}")
+            
             # Load JSON file and insert into expression table
-            self.con.execute(f"""
-                INSERT INTO expression
-                SELECT 
-                    "Name" as seqhash_id,
-                    sample as sample_id,
-                    TPM as tpm,
-                    NumReads as num_reads,
-                    EffectiveLength as effective_length
-                FROM read_json_auto('{expression_path}')
-                WHERE "Name" IN (SELECT seqhash_id FROM sequences)
-                AND NOT EXISTS (
-                    SELECT 1 FROM expression 
-                    WHERE seqhash_id = "Name" AND sample_id = '{sample_id}'
-                )
-            """)
+            with self.transaction():
+                # Try a different approach: use pandas to load the JSON, then insert to DuckDB
+                import pandas as pd
+                import json
+                
+                # Read JSON from file
+                with open(expression_path, 'r') as f:
+                    json_data = json.load(f)
+                
+                # Convert to pandas DataFrame
+                df = pd.DataFrame(json_data)
+                
+                # Rename columns to match our schema
+                df_renamed = df.rename(columns={
+                    'Name': 'seqhash_id',
+                    'TPM': 'tpm',
+                    'NumReads': 'num_reads',
+                    'EffectiveLength': 'effective_length'
+                })
+                
+                # Add sample_id column
+                df_renamed['sample_id'] = sample_id
+                
+                # Register dataframe with duckdb
+                self.con.register('temp_expression_df', df_renamed)
+                
+                # Insert from dataframe to expression table
+                self.con.execute("""
+                    INSERT INTO expression (seqhash_id, sample_id, tpm, num_reads, effective_length)
+                    SELECT 
+                        seqhash_id,
+                        sample_id,
+                        tpm,
+                        num_reads,
+                        effective_length
+                    FROM temp_expression_df
+                    WHERE seqhash_id IN (SELECT seqhash_id FROM sequences)
+                    AND NOT EXISTS (
+                        SELECT 1 FROM expression 
+                        WHERE expression.seqhash_id = temp_expression_df.seqhash_id 
+                        AND expression.sample_id = temp_expression_df.sample_id
+                    )
+                """)
             
             expression_loaded = self.con.execute(
                 "SELECT COUNT(*) FROM expression WHERE sample_id = ?", 
@@ -501,7 +526,7 @@ class SequenceDBBuilder:
                         metadata.get('run_published')
                     ])
                 
-                # Load sequences
+                # Load sequences - this must happen first for foreign key constraints
                 duplicates = []
                 sequences_loaded = self._load_sequences(paths.sequences, sample_id, duplicates)
                 
@@ -512,10 +537,19 @@ class SequenceDBBuilder:
                 else:
                     self.logger.warning(f"No annotation file found: {paths.annotations}")
                 
-                # Load expression data if available
+                # Check if the sequences were properly loaded
+                seq_count = self.con.execute("SELECT COUNT(*) FROM sequences WHERE sample_id = ?", 
+                                          [sample_id]).fetchone()[0]
+                self.logger.info(f"Verified sequence loading: {seq_count} sequences found in DB")
+                
+                # Load expression data if available - only after sequences are loaded
                 expression_loaded = 0
                 if paths.expression.exists():
-                    expression_loaded = self._load_expression(paths.expression, sample_id)
+                    # Make sure we have sequences to link expression data to
+                    if seq_count > 0:
+                        expression_loaded = self._load_expression(paths.expression, sample_id)
+                    else:
+                        self.logger.warning("Cannot load expression data: no sequences loaded")
                 else:
                     self.logger.warning(f"No expression file found: {paths.expression}")
                 

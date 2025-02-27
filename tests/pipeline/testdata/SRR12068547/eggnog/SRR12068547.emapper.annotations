@@ -1,0 +1,34 @@
+# emapper.py -m diamond --target_orthologs all --seed_ortholog_evalue 0.001 --seed_ortholog_score 60.0 --query_cover 20 --subject_cover 0 --override -i /tmp/tmp9tllfehp/job_1/SRR12068547.pep --output_dir /tmp/tmp9tllfehp/job_1 -o SRR12068547 --temp_dir /tmp/tmp9tllfehp/job_1 --database-type proteins --matrix BLOSUM62 --tax_scope auto --evalue 0.001 --score 60 --search_type diamond --itype proteins --output_dir /tmp/tmp9tllfehp/job_1 --temp_dir /tmp/tmp9tllfehp/job_1 -o SRR12068547 --cpu 10 --target_orthologs all --query_cover 20 --subject_cover 0 --go_evidence all --pfam_realign none --report_orthologs --seed_ortholog_evalue 0.001 --seed_ortholog_score 60.0 --output_dir /tmp/tmp9tllfehp/job_1
+# emapper version: 2.1.9
+# command: emapper.py -m diamond --target_orthologs all --seed_ortholog_evalue 0.001 --seed_ortholog_score 60.0 --query_cover 20 --subject_cover 0 --override -i /tmp/tmp9tllfehp/job_1/SRR12068547.pep --output_dir /tmp/tmp9tllfehp/job_1 -o SRR12068547 --temp_dir /tmp/tmp9tllfehp/job_1
+# citation: Cantalapiedra CP, Hernandez-Plaza A, Letunic I, Bork P, Huerta-Cepas J. eggNOG-mapper v2: Functional Annotation, Orthology Assignments, and Domain Prediction at the Metagenomic Scale. Molecular Biology and Evolution, mSystems 6:e00804-21; https://doi.org/10.1128/msystems.00804-21
+# time: 11 May 2023 09:11:20
+# current working directory: /tmp/tmp9tllfehp/job_1
+# mmap: use_mmap=True, mem_limit=0B
+# version: 5.0.2
+# database: proteins 5.0.2
+# tax. scope: auto
+# target orthologs: all
+# Orthologs with domain overlap above 80% are prioritized
+# Sequence search parameters:
+#   search method: diamond
+#   E-value threshold: 0.001
+#   bit-score threshold: 60.0
+#   query coverage threshold: 20
+#   subject coverage threshold: 0
+# Seed ortholog search parameters:
+#   E-value threshold: 0.001
+#   bit-score threshold: 60.0
+# Domain search parameters:
+#   predicting domains: True
+#   database: pfam33.1
+# Predict domain overlaps: yes
+# Predict PFAM domains: yes
+# Selected Pfam family algorithm: realign+hmmscan
+# Realign Pfam domains: False
+# PFAM realignment parameters:
+#   E-value threshold: 0.1
+#   bit-score threshold: 0.0
+v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c	1258431.k121_43339_1|159-311|-|243.50	3.4e-37	150.0	1258431@2GVH7,1258431@COG0111@1,1258431@ENOG5030BJD,1258431@ENOG5030CCK,1258431@ENOG5030CKZ,1258431@ENOG5030DJC	eukaryotes	E	phosphoglycerate dehydrogenase or related dehydrogenase	serA	GO:0006564,GO:0016616,GO:0051287,GO:0055114	EC:1.1.1.95		KEGG:Glycine, serine and threonine metabolism,KEGG:Biosynthesis of amino acids,KEGG:Carbon metabolism,KEGG:2-Oxocarboxylic acid metabolism,KEGG:Glycolysis / Gluconeogenesis,KEGG:Alanine, aspartate and glutamate metabolism,KEGG:Glyoxylate and dicarboxylate metabolism,KEGG:Microbial metabolism in diverse environments				PF02826.18	NAD_Gly3P_dh_N,pfam
+v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace	1258431.k121_2046_1|3-456|+|219.02	3.3e-70	246.0	1258431@COG1192@1,1258431@ENOG5030CJW,1258431@ENOG5030EGZ	eukaryotes	O	preflagellin peptidase (type IV prepilin peptidase).	PilD	GO:0004175,GO:0008233		KEGG:M00546,KEGG:M00772,KEGG:M00774	KEGG:Bacterial secretion system				PF01478.16
+v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf	1258431.k121_98254_2|1-396|+|342.84	3.9e-65	227.0	1258431@COG0111@1,1258431@ENOG5030CCK,1258431@ENOG5030CKZ,1258431@ENOG5030DJC	NA	E	phosphoglycerate dehydrogenase or related dehydrogenase	serA	GO:0016616,GO:0051287	EC:1.1.1.95	KEGG:K00058	KEGG:Glycine, serine and threonine metabolism,KEGG:Carbon metabolism,KEGG:Biosynthesis of amino acids,KEGG:Microbial metabolism in diverse environments	KEGG:R01513,KEGG:R01512						CAZy:GT5
