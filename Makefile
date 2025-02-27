@@ -109,7 +109,7 @@ deploy: image
 # --- Testing ---
 
 test:
-	pytest
+	python -m pytest tests/
 
 test-all:
 	pytest --runslow --html=pytest-full.html --self-contained-html
