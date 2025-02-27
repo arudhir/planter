@@ -198,43 +198,86 @@ class SequenceDBBuilder:
         
         existing_seqs = set(self.con.execute("SELECT seqhash_id FROM sequences").df()['seqhash_id'])
         sequences = []
+        gene_protein_maps = []
         sequences_loaded = 0
         skipped_count = 0
         
-        for record in SeqIO.parse(sequence_path, "fasta"):
-            seqhash_id = record.id.split()[0]
+        # Use with statement to properly close the file
+        with open(sequence_path, 'r') as f:
+            for record in SeqIO.parse(f, "fasta"):
+                # Example ID: v1_DLS_xxxxx.p1
+                protein_seqhash_id = record.id.split()[0]
+                
+                # Extract gene seqhash from protein seqhash by removing .p1, .p2, etc.
+                gene_seqhash_id = protein_seqhash_id.split('.p')[0]
             
-            if seqhash_id in existing_seqs:
-                duplicates.append({
-                    'seqhash_id': seqhash_id,
+                if protein_seqhash_id in existing_seqs:
+                    duplicates.append({
+                        'seqhash_id': protein_seqhash_id,
+                        'sample_id': sample_id,
+                        'length': len(record.seq)
+                    })
+                    skipped_count += 1
+                    continue
+                    
+                sequences.append({
+                    'seqhash_id': protein_seqhash_id,
+                    'sequence': str(record.seq),
                     'sample_id': sample_id,
+                    'assembly_date': datetime.now(),
+                    'is_representative': False,
                     'length': len(record.seq)
                 })
-                skipped_count += 1
-                continue
                 
-            sequences.append({
-                'seqhash_id': seqhash_id,
-                'sequence': str(record.seq),
-                'sample_id': sample_id,
-                'assembly_date': datetime.now(),
-                'is_representative': False,
-                'length': len(record.seq)
-            })
-            sequences_loaded += 1
-            
-            if len(sequences) % 1000 == 0:
-                self._batch_insert_sequences(sequences)
-                sequences = []
+                # Add the gene-protein mapping
+                gene_protein_maps.append({
+                    'gene_seqhash_id': gene_seqhash_id,
+                    'protein_seqhash_id': protein_seqhash_id
+                })
+                
+                sequences_loaded += 1
+                
+                if len(sequences) % 1000 == 0:
+                    self._batch_insert_sequences(sequences)
+                    self._batch_insert_gene_protein_maps(gene_protein_maps)
+                    sequences = []
+                    gene_protein_maps = []
         
         if sequences:
             self._batch_insert_sequences(sequences)
+        
+        if gene_protein_maps:
+            self._batch_insert_gene_protein_maps(gene_protein_maps)
         
         self.logger.info(f"Loaded {sequences_loaded} new sequences for {sample_id}")
         if skipped_count > 0:
             self.logger.info(f"Skipped {skipped_count} duplicate sequences")
             
         return sequences_loaded
+        
+    def _batch_insert_gene_protein_maps(self, gene_protein_maps: List[dict]):
+        """Helper method to insert gene-protein mappings in batches."""
+        if not gene_protein_maps:
+            return
+        
+        # Since gene_seqhash_id is now a primary key, we need to ensure uniqueness
+        # Group by gene_seqhash_id and take the first protein for each gene
+        unique_maps = {}
+        for mapping in gene_protein_maps:
+            gene_id = mapping['gene_seqhash_id']
+            if gene_id not in unique_maps:
+                unique_maps[gene_id] = mapping
+        
+        # Convert unique maps back to a list
+        unique_gene_protein_maps = list(unique_maps.values())
+        
+        # Create dataframe and insert
+        df = pd.DataFrame(unique_gene_protein_maps)
+        self.con.execute("""
+            INSERT INTO gene_protein_map
+            SELECT * FROM df
+            ON CONFLICT DO NOTHING
+        """)
 
     def _load_annotations(self, annotation_path: Path, sample_id: str) -> int:
         """Load and process annotations from eggNOG file."""
@@ -438,7 +481,7 @@ class SequenceDBBuilder:
                 
                 # Rename columns to match our schema
                 df_renamed = df.rename(columns={
-                    'Name': 'seqhash_id',
+                    'Name': 'gene_seqhash_id',  # This is the gene ID without the .p1, .p2 suffix
                     'TPM': 'tpm',
                     'NumReads': 'num_reads',
                     'EffectiveLength': 'effective_length'
@@ -451,19 +494,38 @@ class SequenceDBBuilder:
                 self.con.register('temp_expression_df', df_renamed)
                 
                 # Insert from dataframe to expression table
+                # First make sure all gene_seqhash_ids in the expression data exist in the gene_protein_map
+                # If they don't exist, create new entries in gene_protein_map for them
+                # This ensures referential integrity for expression data
                 self.con.execute("""
-                    INSERT INTO expression (seqhash_id, sample_id, tpm, num_reads, effective_length)
+                    INSERT INTO gene_protein_map (gene_seqhash_id, protein_seqhash_id)
+                    SELECT DISTINCT 
+                        temp_expression_df.gene_seqhash_id,
+                        temp_expression_df.gene_seqhash_id || '.p1' as protein_seqhash_id
+                    FROM temp_expression_df
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM gene_protein_map
+                        WHERE gene_protein_map.gene_seqhash_id = temp_expression_df.gene_seqhash_id
+                    )
+                    AND temp_expression_df.gene_seqhash_id NOT IN (
+                        SELECT gene_seqhash_id FROM gene_protein_map
+                    )
+                    ON CONFLICT DO NOTHING
+                """)
+                
+                # Then insert the expression data
+                self.con.execute("""
+                    INSERT INTO expression (gene_seqhash_id, sample_id, tpm, num_reads, effective_length)
                     SELECT 
-                        seqhash_id,
+                        gene_seqhash_id,
                         sample_id,
                         tpm,
                         num_reads,
                         effective_length
                     FROM temp_expression_df
-                    WHERE seqhash_id IN (SELECT seqhash_id FROM sequences)
-                    AND NOT EXISTS (
+                    WHERE NOT EXISTS (
                         SELECT 1 FROM expression 
-                        WHERE expression.seqhash_id = temp_expression_df.seqhash_id 
+                        WHERE expression.gene_seqhash_id = temp_expression_df.gene_seqhash_id 
                         AND expression.sample_id = temp_expression_df.sample_id
                     )
                 """)
@@ -710,7 +772,7 @@ class SequenceDBBuilder:
             COUNT(DISTINCT CASE WHEN a.seqhash_id IS NOT NULL THEN s.seqhash_id END) as annotated_sequences,
             COUNT(DISTINCT CASE WHEN g.seqhash_id IS NOT NULL THEN s.seqhash_id END) as sequences_with_go,
             COUNT(DISTINCT CASE WHEN e.seqhash_id IS NOT NULL THEN s.seqhash_id END) as sequences_with_ec,
-            COUNT(DISTINCT CASE WHEN expr.seqhash_id IS NOT NULL THEN s.seqhash_id END) as sequences_with_expression,
+            COUNT(DISTINCT CASE WHEN expr.gene_seqhash_id IS NOT NULL THEN s.seqhash_id END) as sequences_with_expression,
             COUNT(DISTINCT c.cluster_id) as total_clusters,
             ROUND(AVG(s.length), 2) as avg_sequence_length,
             MIN(s.length) as min_sequence_length,
@@ -719,7 +781,8 @@ class SequenceDBBuilder:
         LEFT JOIN annotations a ON s.seqhash_id = a.seqhash_id
         LEFT JOIN go_terms g ON s.seqhash_id = g.seqhash_id
         LEFT JOIN ec_numbers e ON s.seqhash_id = e.seqhash_id
-        LEFT JOIN expression expr ON s.seqhash_id = expr.seqhash_id
+        LEFT JOIN gene_protein_map gpm ON s.seqhash_id = gpm.protein_seqhash_id
+        LEFT JOIN expression expr ON gpm.gene_seqhash_id = expr.gene_seqhash_id
         LEFT JOIN cluster_members cm ON s.seqhash_id = cm.seqhash_id
         LEFT JOIN clusters c ON cm.cluster_id = c.cluster_id
         """

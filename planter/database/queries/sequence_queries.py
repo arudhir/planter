@@ -23,4 +23,5 @@ class SequenceQueries(BaseQueryManager):
             
     def get_expression_for_sequence(self, seqhash_id):
         """Get expression data for a specific sequence across all samples."""
-        return self._execute_query("sequence_expression", values=[seqhash_id])
+        # Pass the seqhash_id three times for the WITH clause parameter substitution
+        return self._execute_query("sequence_expression", values=[seqhash_id, seqhash_id, seqhash_id])

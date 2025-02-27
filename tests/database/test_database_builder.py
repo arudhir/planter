@@ -151,7 +151,7 @@ class TestSequenceDBBuilder(unittest.TestCase):
             expr = builder.con.execute("""
                 SELECT tpm, num_reads, effective_length 
                 FROM expression 
-                WHERE seqhash_id = ?
+                WHERE gene_seqhash_id = ?
             """, ["v1_DLS_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"]).fetchone()
             
             self.assertAlmostEqual(expr[0], 10.5)  # TPM

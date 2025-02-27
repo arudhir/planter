@@ -90,7 +90,8 @@ class TestSchemaMigrations(unittest.TestCase):
             'kegg_info',
             'clusters',
             'cluster_members',
-            'expression'  # New table from our migration
+            'expression',  # From 003_add_expression_table.sql
+            'gene_protein_map'  # New table from 004_add_gene_protein_map.sql
         ]
         
         for table in required_tables:
@@ -113,7 +114,7 @@ class TestSchemaMigrations(unittest.TestCase):
         column_dict = {col[1]: col[2].upper() for col in columns}
         
         # Check required columns
-        self.assertIn('seqhash_id', column_dict)
+        self.assertIn('gene_seqhash_id', column_dict)  # Changed from seqhash_id to gene_seqhash_id
         self.assertIn('sample_id', column_dict)
         self.assertIn('tpm', column_dict)
         self.assertIn('num_reads', column_dict)
@@ -147,7 +148,7 @@ class TestSchemaMigrations(unittest.TestCase):
         """).fetchone()[0]
         
         # Verify the SQL contains the foreign key constraints
-        self.assertIn("FOREIGN KEY (seqhash_id) REFERENCES sequences(seqhash_id)", table_sql)
+        self.assertIn("FOREIGN KEY (gene_seqhash_id) REFERENCES gene_protein_map(gene_seqhash_id)", table_sql)
         self.assertIn("FOREIGN KEY (sample_id) REFERENCES sra_metadata(sample_id)", table_sql)
 
 

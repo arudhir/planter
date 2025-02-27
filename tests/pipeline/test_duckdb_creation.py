@@ -79,6 +79,41 @@ class TestDuckDBCreation(unittest.TestCase):
         print(f"EggNOG file size: {eggnog_file.stat().st_size} bytes") 
         print(f"Quant file exists: {quant_file.exists()}")
         print(f"Quant file size: {quant_file.stat().st_size} bytes")
+        
+        # Modify the transdecoder file to ensure protein IDs have .p1 suffixes
+        self._fix_protein_ids(transdecoder_file)
+        
+    def _fix_protein_ids(self, transdecoder_file):
+        """Ensure protein IDs in the transdecoder file have .p1 suffixes."""
+        if not transdecoder_file.exists():
+            return
+            
+        # Read the file
+        with open(transdecoder_file, 'r') as f:
+            content = f.read()
+        
+        # Add .p1 suffix to sequences that don't already have it
+        lines = content.split('\n')
+        modified_lines = []
+        
+        for line in lines:
+            if line.startswith('>'):
+                # Check if it already has a .p suffix
+                if not any(p in line for p in ['.p1', '.p2', '.p3']):
+                    # Add .p1 suffix after the sequence ID
+                    parts = line.split(' ', 1)
+                    if len(parts) > 1:
+                        modified_lines.append(f"{parts[0]}.p1 {parts[1]}")
+                    else:
+                        modified_lines.append(f"{parts[0]}.p1")
+                else:
+                    modified_lines.append(line)
+            else:
+                modified_lines.append(line)
+        
+        # Write modified content back to file
+        with open(transdecoder_file, 'w') as f:
+            f.write('\n'.join(modified_lines))
     
     @patch('planter.database.builder.get_sra_info')
     def test_duckdb_creation(self, mock_get_sra_info):
@@ -120,9 +155,17 @@ class TestDuckDBCreation(unittest.TestCase):
             # Create test sequence data
             sequences_table = """
             INSERT INTO sequences VALUES
-            ('v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c', 'ACTG', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4),
-            ('v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace', 'GGCC', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4),
-            ('v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf', 'AATT', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4);
+            ('v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c.p1', 'ACTG', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4),
+            ('v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace.p1', 'GGCC', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4),
+            ('v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf.p1', 'AATT', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4);
+            """
+            
+            # Create gene-protein mapping data
+            gene_protein_table = """
+            INSERT INTO gene_protein_map VALUES
+            ('v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c', 'v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c.p1'),
+            ('v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace', 'v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace.p1'),
+            ('v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf', 'v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf.p1');
             """
             with builder.transaction():
                 # Insert metadata
@@ -136,6 +179,9 @@ class TestDuckDBCreation(unittest.TestCase):
                 
                 # Insert sequences
                 builder.con.execute(sequences_table)
+                
+                # Insert gene-protein mappings
+                builder.con.execute(gene_protein_table)
             
             # Load expression data directly
             quant_path = Path(self.output_dir) / self.sample_id / 'quants' / f'{self.sample_id}.quant.json'
@@ -203,23 +249,37 @@ class TestDuckDBCreation(unittest.TestCase):
                 length INTEGER
             );
             
+            CREATE TABLE gene_protein_map (
+                gene_seqhash_id VARCHAR PRIMARY KEY,
+                protein_seqhash_id VARCHAR NOT NULL,
+                FOREIGN KEY (protein_seqhash_id) REFERENCES sequences(seqhash_id)
+            );
+            
             CREATE TABLE expression (
-                seqhash_id VARCHAR NOT NULL,
+                gene_seqhash_id VARCHAR NOT NULL,
                 sample_id VARCHAR NOT NULL,
                 tpm DOUBLE NOT NULL,
                 num_reads DOUBLE NOT NULL,
                 effective_length DOUBLE NOT NULL,
-                PRIMARY KEY (seqhash_id, sample_id),
-                FOREIGN KEY (seqhash_id) REFERENCES sequences(seqhash_id)
+                PRIMARY KEY (gene_seqhash_id, sample_id),
+                FOREIGN KEY (gene_seqhash_id) REFERENCES gene_protein_map(gene_seqhash_id)
             );
         """)
         
-        # Insert test sequences
+        # Insert test protein sequences
         con.execute("""
             INSERT INTO sequences VALUES
-            ('v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c', 'ACTG', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4),
-            ('v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace', 'GGCC', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4),
-            ('v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf', 'AATT', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4);
+            ('v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c.p1', 'ACTG', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4),
+            ('v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace.p1', 'GGCC', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4),
+            ('v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf.p1', 'AATT', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4);
+        """)
+        
+        # Insert gene-protein mappings
+        con.execute("""
+            INSERT INTO gene_protein_map VALUES
+            ('v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c', 'v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c.p1'),
+            ('v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace', 'v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace.p1'),
+            ('v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf', 'v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf.p1');
         """)
         
         # Load expression data from the quant.json file
@@ -231,7 +291,7 @@ class TestDuckDBCreation(unittest.TestCase):
         
         # Rename columns to match our schema
         df_renamed = df.rename(columns={
-            'Name': 'seqhash_id',
+            'Name': 'gene_seqhash_id',  # Gene sequences don't have .p1 suffix
             'TPM': 'tpm',
             'NumReads': 'num_reads',
             'EffectiveLength': 'effective_length'
@@ -245,14 +305,16 @@ class TestDuckDBCreation(unittest.TestCase):
         
         # Insert from dataframe to expression table
         con.execute("""
-            INSERT INTO expression (seqhash_id, sample_id, tpm, num_reads, effective_length)
+            INSERT INTO expression (gene_seqhash_id, sample_id, tpm, num_reads, effective_length)
             SELECT 
-                seqhash_id,
+                gene_seqhash_id,
                 sample_id,
                 tpm,
                 num_reads,
                 effective_length
             FROM temp_expression_df
+            -- Only insert expression records for genes that exist in gene_protein_map
+            WHERE gene_seqhash_id IN (SELECT gene_seqhash_id FROM gene_protein_map)
         """)
         
         # Verify data was loaded
@@ -261,7 +323,7 @@ class TestDuckDBCreation(unittest.TestCase):
         
         # Verify expression data values
         expression_data = con.execute("""
-            SELECT e.seqhash_id, e.tpm, e.num_reads, e.effective_length
+            SELECT e.gene_seqhash_id, e.tpm, e.num_reads, e.effective_length
             FROM expression e
             ORDER BY e.tpm DESC
             LIMIT 5
@@ -334,12 +396,20 @@ class TestDuckDBCreation(unittest.TestCase):
                     )
                 """)
                 
-                # Insert sequences
+                # Insert protein sequences
                 builder.con.execute("""
                     INSERT INTO sequences VALUES
-                    ('v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c', 'ACTG', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4),
-                    ('v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace', 'GGCC', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4),
-                    ('v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf', 'AATT', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4);
+                    ('v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c.p1', 'ACTG', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4),
+                    ('v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace.p1', 'GGCC', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4),
+                    ('v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf.p1', 'AATT', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4);
+                """)
+                
+                # Insert gene-protein mapping
+                builder.con.execute("""
+                    INSERT INTO gene_protein_map VALUES
+                    ('v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c', 'v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c.p1'),
+                    ('v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace', 'v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace.p1'),
+                    ('v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf', 'v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf.p1');
                 """)
             
             # Load expression data directly
@@ -383,7 +453,8 @@ class TestDuckDBCreation(unittest.TestCase):
             SELECT 
                 CORR(s.length, e.tpm) as length_tpm_correlation
             FROM sequences s
-            JOIN expression e ON s.seqhash_id = e.seqhash_id
+            JOIN gene_protein_map gpm ON s.seqhash_id = gpm.protein_seqhash_id
+            JOIN expression e ON gpm.gene_seqhash_id = e.gene_seqhash_id
             """
             
             # This will fail in our test since we're using fixed length sequences,
@@ -402,7 +473,8 @@ class TestDuckDBCreation(unittest.TestCase):
                 e.num_reads,
                 s.length
             FROM sequences s
-            JOIN expression e ON s.seqhash_id = e.seqhash_id
+            JOIN gene_protein_map gpm ON s.seqhash_id = gpm.protein_seqhash_id
+            JOIN expression e ON gpm.gene_seqhash_id = e.gene_seqhash_id
             ORDER BY e.tpm DESC
             LIMIT 5
             """

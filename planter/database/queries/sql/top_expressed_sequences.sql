@@ -4,7 +4,7 @@
 -- Limit controls how many sequences to return (default: 10)
 
 SELECT 
-    e.seqhash_id,
+    e.gene_seqhash_id,
     e.sample_id,
     s.sample_id as original_sample,
     e.tpm,
@@ -15,7 +15,8 @@ SELECT
     a.description,
     a.preferred_name
 FROM expression e
-JOIN sequences s ON e.seqhash_id = s.seqhash_id
+JOIN gene_protein_map gpm ON e.gene_seqhash_id = gpm.gene_seqhash_id
+JOIN sequences s ON gpm.protein_seqhash_id = s.seqhash_id
 LEFT JOIN annotations a ON s.seqhash_id = a.seqhash_id
 WHERE
     e.sample_id = COALESCE(?, e.sample_id)
