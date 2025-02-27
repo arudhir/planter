@@ -376,6 +376,14 @@ class TestExpressionQueries(unittest.TestCase):
         for row in joined_data:
             print(f"Protein: {row[0]} | Gene: {row[3]} | Name: {row[1]} | TPM: {row[4]}")
             
+        # Test the new helper method in the QueryManager
+        result = self.query_manager.sequences.get_annotation_with_expression(limit=10)
+        self.assertGreater(len(result), 0, "Should get results from annotation_with_expression")
+        
+        # Print the result of the helper method
+        print("\nResults from get_annotation_with_expression method:")
+        print(result)
+            
     def test_expression_level_categories(self):
         """Test expression level categories across different genes."""
         # Query that categorizes expression levels

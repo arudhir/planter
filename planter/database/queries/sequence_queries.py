@@ -25,3 +25,19 @@ class SequenceQueries(BaseQueryManager):
         """Get expression data for a specific sequence across all samples."""
         # Pass the seqhash_id three times for the WITH clause parameter substitution
         return self._execute_query("sequence_expression", values=[seqhash_id, seqhash_id, seqhash_id])
+        
+    def get_annotation_with_expression(self, sample_id=None, limit=50):
+        """Get annotations together with expression levels.
+        
+        This query joins across annotations, gene-protein mapping, and expression tables
+        to provide a comprehensive view of proteins with their expression data.
+        
+        Args:
+            sample_id: Optional filter for a specific sample
+            limit: Maximum number of results to return (default: 50)
+            
+        Returns:
+            DataFrame with protein annotations and expression levels
+        """
+        params = {'limit': limit}
+        return self._execute_query("annotation_with_expression", params=params, values=[sample_id])
