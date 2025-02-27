@@ -13,34 +13,73 @@
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
         h1 { color: #333; }
+        .results-container { overflow-x: auto; }
         #resultsTable { width: 100%; border-collapse: collapse; }
         #resultsTable th, #resultsTable td { padding: 8px; border: 1px solid #ddd; }
         #resultsTable th { background-color: #f2f2f2; cursor: pointer; }
         #resultsTable tr:nth-child(even) { background-color: #f9f9f9; }
         #resultsTable tr:hover { background-color: #f5f5f5; }
+        .highlight-cell { background-color: #e8f4f8; }
+        .expression-badge {
+            display: inline-block;
+            padding: 3px 6px;
+            border-radius: 3px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        .high-expression { background-color: #d4edda; color: #155724; }
+        .medium-expression { background-color: #fff3cd; color: #856404; }
+        .low-expression { background-color: #f8f9fa; color: #6c757d; }
+        .home-link { margin-bottom: 15px; }
     </style>
 </head>
 <body>
+    <div class="home-link">
+        <a href="/">&larr; Back to Search</a>
+    </div>
+    
     <h1>MMSeqs2 Search Results</h1>
+    
     {% if results.data %}
-        <table id="resultsTable">
-            <thead>
-                <tr>
-                    {% for header in results.headers %}
-                        <th>{{ header }}</th>
-                    {% endfor %}
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in results.data %}
+        <div class="results-container">
+            <table id="resultsTable">
+                <thead>
                     <tr>
                         {% for header in results.headers %}
-                            <td>{{ row[header] }}</td>
+                            <th>{{ header|replace('_', ' ')|title }}</th>
                         {% endfor %}
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    {% for row in results.data %}
+                        <tr>
+                            {% for header in results.headers %}
+                                {% if header == 'tpm' and row[header] %}
+                                    <td class="highlight-cell">
+                                        {{ "%.2f"|format(row[header]|float) }}
+                                        {% if row[header]|float > 100 %}
+                                            <span class="expression-badge high-expression">High</span>
+                                        {% elif row[header]|float > 10 %}
+                                            <span class="expression-badge medium-expression">Medium</span>
+                                        {% else %}
+                                            <span class="expression-badge low-expression">Low</span>
+                                        {% endif %}
+                                    </td>
+                                {% elif header == 'evalue' %}
+                                    <td>{{ "%.2e"|format(row[header]|float) }}</td>
+                                {% elif header == 'pident' %}
+                                    <td>{{ "%.1f"|format(row[header]|float) }}</td>
+                                {% elif header == 'gene_id' %}
+                                    <td class="highlight-cell">{{ row[header] }}</td>
+                                {% else %}
+                                    <td>{{ row[header] }}</td>
+                                {% endif %}
+                            {% endfor %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     {% else %}
         <p>No results found.</p>
     {% endif %}
@@ -52,22 +91,25 @@
             $('#resultsTable').DataTable({
                 "pageLength": 25,
                 "lengthMenu": [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
-                "order": [[10, "asc"]],
+                "order": [[4, "asc"]], // Sort by e-value by default
                 "columnDefs": [
-                    { "type": "scientific", "targets": 10 },
+                    { 
+                        "targets": headers.indexOf("evalue"),
+                        "type": "scientific" 
+                    },
                     {
                         "targets": "_all",
                         "render": function(data, type, row, meta) {
-                            return row[headers[meta.col]] || '';
+                            return data || '';
                         }
                     }
                 ],
                 "scrollX": true,
                 "ordering": true,
-                "searching": true
-
+                "searching": true,
+                "responsive": true
             });
-
+        });
     </script>
-    </body>
+</body>
 </html>

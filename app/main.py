@@ -3,6 +3,7 @@ import subprocess
 import tempfile
 import os
 import logging
+from pathlib import Path
 from app.config import config
 from planter.database.query_manager import DatabaseManager
 
@@ -29,18 +30,57 @@ def create_app(config_name='default'):
             app.logger.error(f"Error loading example: {str(e)}")
             return jsonify({'error': 'Failed to load example sequence'}), 500
 
-    def get_sequence_annotations(seqhash_ids):
-        """Fetch annotations for given seqhash_ids from the database."""
+    def get_sequence_details(seqhash_ids):
+        """Fetch annotations and expression for the given seqhash_ids from the database.
+        
+        Retrieves comprehensive information about sequences:
+        - Annotations (GO terms, EC numbers, description, etc.)
+        - Expression data (TPM values)
+        - Gene to protein mappings
+        
+        Args:
+            seqhash_ids: List of protein seqhash IDs to query
+            
+        Returns:
+            Dictionary of sequence information indexed by seqhash_id
+        """
         try:
             with DatabaseManager(app.config['DUCKDB_PATH']) as db:
-                # Pass seqhash_ids as a single-element tuple containing a list
-                annotations = db.query_manager.sequence_annotations(values=(seqhash_ids,))
-                app.logger.debug(f"Raw annotations: {annotations}")
-                if annotations.empty:
-                    app.logger.warning(f"No annotations found for seqhash_ids: {seqhash_ids}")
-                    return {}
-                # Return annotations as a dictionary keyed by seqhash_id
-                return annotations.set_index('seqhash_id').to_dict('index')
+                # First get the basic annotations using the canonical query
+                annotations_df = db.query_manager.sequence.get_by_id(seqhash_ids[0])
+                
+                # Collect all sequence results
+                results = {}
+                
+                for seqhash_id in seqhash_ids:
+                    # Get detailed information for this sequence
+                    annotation = db.query_manager.sequence.get_by_id(seqhash_id)
+                    
+                    if not annotation.empty:
+                        # Get expression data for the corresponding gene
+                        expression_data = db.query_manager.sequence.get_annotation_with_expression(
+                            sample_id=annotation.iloc[0].get('sample_id', None)
+                        )
+                        
+                        # Filter expression data for this sequence
+                        seq_expression = expression_data[expression_data['protein_id'] == seqhash_id]
+                        
+                        # Create a dictionary for this sequence
+                        seq_dict = annotation.iloc[0].to_dict()
+                        
+                        # Add expression data if available
+                        if not seq_expression.empty:
+                            seq_dict.update({
+                                'gene_id': seq_expression.iloc[0].get('gene_id', ''),
+                                'tpm': seq_expression.iloc[0].get('tpm', 0),
+                                'num_reads': seq_expression.iloc[0].get('num_reads', 0)
+                            })
+                        
+                        results[seqhash_id] = seq_dict
+                
+                app.logger.debug(f"Retrieved sequence details: {results}")
+                return results
+                
         except Exception as e:
             app.logger.error(f"Database error: {e}")
             return {}
@@ -49,22 +89,24 @@ def create_app(config_name='default'):
         app.logger.debug(f"Starting MMSeqs2 search with sequence: {sequence}")
         
         with tempfile.TemporaryDirectory() as temp_dir:
-            input_file = os.path.join(temp_dir, "input.fasta")
-            output_file = os.path.join(temp_dir, "output.tsv")
-            tmp_dir = os.path.join(temp_dir, "tmp")
+            tmp_dir = Path(temp_dir)
+            input_file = tmp_dir / "input.fasta"
+            output_file = tmp_dir / "output.tsv"
+            mmseqs_tmp = tmp_dir / "tmp"
             
             with open(input_file, 'w') as f:
                 f.write(f">query\n{sequence}\n")
             
             try:
                 mmseqs_command = [
-                    "mmseqs", "easy-search", input_file, app.config['MMSEQS_DB'], output_file, tmp_dir,
+                    "mmseqs", "easy-search", str(input_file), app.config['MMSEQS_DB'], 
+                    str(output_file), str(mmseqs_tmp),
                     "--format-output", "query,target,pident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,tseq"
                 ]
                 
-                process = subprocess.run(mmseqs_command, capture_output=True, text=True, check=True)
+                subprocess.run(mmseqs_command, capture_output=True, text=True, check=True)
                 
-                if os.path.exists(output_file):
+                if output_file.exists():
                     with open(output_file, 'r') as f:
                         results = f.read().splitlines()
                     
@@ -76,30 +118,27 @@ def create_app(config_name='default'):
                     # Get target sequence IDs
                     seqhash_ids = [row['target'] for row in parsed_results]
                     app.logger.debug(f"Searching for seqhash_ids: {seqhash_ids}")
-                    annotations = get_sequence_annotations(seqhash_ids)
-                    app.logger.debug(f"Retrieved annotations: {annotations}")
-                                        
-                    # Get annotations from database
-                    annotations = get_sequence_annotations(seqhash_ids)
                     
-                    # Merge MMSeqs2 results with annotations
+                    # Get comprehensive sequence information using the canonical query
+                    sequence_details = get_sequence_details(seqhash_ids)
+                    
+                    # Merge MMSeqs2 results with detailed sequence information
                     merged_results = []
                     for result in parsed_results:
                         target_id = result['target']
-                        annotation = annotations.get(target_id, {})  # Safely get annotations or default to an empty dict
-                        result.update(annotation)  # Add annotation fields to the result
+                        details = sequence_details.get(target_id, {})  # Get sequence details or default to empty dict
+                        result.update(details)  # Add all sequence details to the result
                         merged_results.append(result)
 
-                    # Dynamically update headers based on merged results
-                    headers = list({key for row in merged_results for key in row.keys()})
-                    
-                    # Update headers with annotation fields
+                    # Define desired display order for headers
                     desired_headers = [
-                        'query', 'target', 'pident', 'alnlen', 'mismatch', 'gapopen', 
-                        'qstart', 'qend', 'tstart', 'tend', 'evalue', 'bits',
-                        'organism', 'description', 'preferred_name', 'cog_category', 
-                        'go_terms', 'ec_numbers', 'kegg_ko', 'kegg_pathway', 'tseq'
+                        'query', 'target', 'pident', 'alnlen', 'evalue', 'bits',
+                        'preferred_name', 'description', 'organism', 'tpm', 'gene_id', 
+                        'cog_category', 'go_terms', 'ec_numbers', 'kegg_pathway', 'kegg_ko',
+                        'qstart', 'qend', 'tstart', 'tend', 'mismatch', 'gapopen', 'tseq'
                     ]
+                    
+                    # Filter to headers that are actually present in the results
                     headers = [h for h in desired_headers if any(h in d for d in merged_results)]
                     return {'headers': headers, 'data': merged_results}
                 else:
