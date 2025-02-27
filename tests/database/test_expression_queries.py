@@ -409,6 +409,58 @@ class TestExpressionQueries(unittest.TestCase):
             
         self.assertGreater(len(result), 1, "Should have multiple expression level categories")
 
+    def test_search_sequences(self):
+        """Test the sequence search functionality."""
+        # Search by description
+        result = self.query_manager.sequences.search_sequences(description="Phosphoglycerate")
+        self.assertGreater(len(result), 0, "Should find sequence with 'Phosphoglycerate' in description")
+        self.assertEqual(result.iloc[0]['description'], 'Phosphoglycerate dehydrogenase')
+        
+        # Search by minimum length
+        result = self.query_manager.sequences.search_sequences(min_length=5000)
+        self.assertGreater(len(result), 0, "Should find sequences with length >= 5000")
+        self.assertGreaterEqual(result.iloc[0]['length'], 5000)
+        
+        # Search by maximum length
+        result = self.query_manager.sequences.search_sequences(max_length=2500)
+        self.assertGreater(len(result), 0, "Should find sequences with length <= 2500")
+        self.assertLessEqual(result.iloc[0]['length'], 2500)
+        
+        # Combined search
+        result = self.query_manager.sequences.search_sequences(
+            sample_ids=[self.sample_id],
+            min_length=2000,
+            max_length=3000,
+            description="Preflagellin"
+        )
+        self.assertGreater(len(result), 0, "Should find matching sequence with combined criteria")
+        self.assertEqual(result.iloc[0]['description'], 'Preflagellin peptidase')
+        self.assertGreaterEqual(result.iloc[0]['length'], 2000)
+        self.assertLessEqual(result.iloc[0]['length'], 3000)
+        
+        print("\nSearch results for combined criteria:")
+        print(result)
+        
+    def test_search_with_nonexistent_data(self):
+        """Test search functionality with criteria that won't match."""
+        # Search with a description that doesn't exist
+        result = self.query_manager.sequences.search_sequences(description="NonexistentDescription12345")
+        self.assertEqual(len(result), 0, "Should not find any sequences with nonexistent description")
+        
+        # Search with an impossible length range
+        result = self.query_manager.sequences.search_sequences(min_length=10000, max_length=5000)
+        self.assertEqual(len(result), 0, "Should not find any sequences with impossible length range")
+        
+        # Search with nonexistent sample ID
+        result = self.query_manager.sequences.search_sequences(sample_ids=["NonexistentSample12345"])
+        self.assertEqual(len(result), 0, "Should not find any sequences with nonexistent sample ID")
+        
+        # Search with nonexistent GO term
+        result = self.query_manager.sequences.search_sequences(go_terms=["GO:99999999"])
+        self.assertEqual(len(result), 0, "Should not find any sequences with nonexistent GO term")
+        
+        print("\nNonexistent search returns empty dataframe as expected")
+
 
 if __name__ == '__main__':
     unittest.main()

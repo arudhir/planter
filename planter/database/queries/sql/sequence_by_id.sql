@@ -24,7 +24,7 @@ LEFT JOIN clusters c ON cm.cluster_id = c.cluster_id
 WHERE s.seqhash_id = ?
 GROUP BY 
     s.seqhash_id, s.sequence, s.sample_id, s.assembly_date, 
-    s.is_representative, s.length, a.seed_ortholog, a.evalue, 
+    s.is_representative, s.repseq_id, s.length, a.seed_ortholog, a.evalue, 
     a.score, a.eggnog_ogs, a.description, a.preferred_name,
     a.cog_category, k.kegg_ko, k.kegg_pathway, k.kegg_module,
     c.cluster_id, c.size

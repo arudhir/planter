@@ -118,4 +118,7 @@ test-all:
 
 bash:
 	docker-compose run --rm planter bash
+
+server:
+	FLASK_APP=app/main.py flask run --host=0.0.0.0 --port=8888
 #vim: set noet
