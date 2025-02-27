@@ -15,6 +15,7 @@ class SamplePaths:
     """Paths for sample data files"""
     sequences: Path  # transdecoder .pep file
     annotations: Path  # eggnog annotations file
+    expression: Path  # salmon quantification json file
 
 @dataclass
 class ProcessingResult:
@@ -98,6 +99,7 @@ class SequenceDBBuilder:
         DROP TABLE IF EXISTS ec_numbers;
         DROP TABLE IF EXISTS go_terms;
         DROP TABLE IF EXISTS annotations;
+        DROP TABLE IF EXISTS expression;
         DROP TABLE IF EXISTS sequences;
         DROP TABLE IF EXISTS sra_metadata;
         DROP TABLE IF EXISTS temp_annotations;
@@ -117,6 +119,7 @@ class SequenceDBBuilder:
             DROP TABLE IF EXISTS ec_numbers;
             DROP TABLE IF EXISTS go_terms;
             DROP TABLE IF EXISTS annotations;
+            DROP TABLE IF EXISTS expression;
             DROP TABLE IF EXISTS sequences;
             DROP TABLE IF EXISTS sra_metadata;
             DROP TABLE IF EXISTS temp_annotations;
@@ -167,7 +170,8 @@ class SequenceDBBuilder:
         sample_dir = self.output_dir / sample_id
         return SamplePaths(
             sequences=sample_dir / f'transdecoder/{sample_id}.pep',
-            annotations=sample_dir / f'eggnog/{sample_id}.emapper.annotations'
+            annotations=sample_dir / f'eggnog/{sample_id}.emapper.annotations',
+            expression=sample_dir / f'quants/{sample_id}.quant.json'
         )
     
     def _fetch_sra_metadata(self, sample_id: str) -> Dict:
@@ -413,6 +417,44 @@ class SequenceDBBuilder:
     #             status='error',
     #             error=str(e)
     #         )
+    def _load_expression(self, expression_path: Path, sample_id: str) -> int:
+        """Load expression data from Salmon quantification JSON file."""
+        self.logger.info(f"Loading expression data from {expression_path}")
+        
+        if not expression_path.exists():
+            self.logger.warning(f"Expression file not found: {expression_path}")
+            return 0
+            
+        try:
+            # Load JSON file and insert into expression table
+            self.con.execute(f"""
+                INSERT INTO expression
+                SELECT 
+                    "Name" as seqhash_id,
+                    sample as sample_id,
+                    TPM as tpm,
+                    NumReads as num_reads,
+                    EffectiveLength as effective_length
+                FROM read_json_auto('{expression_path}')
+                WHERE "Name" IN (SELECT seqhash_id FROM sequences)
+                AND NOT EXISTS (
+                    SELECT 1 FROM expression 
+                    WHERE seqhash_id = "Name" AND sample_id = '{sample_id}'
+                )
+            """)
+            
+            expression_loaded = self.con.execute(
+                "SELECT COUNT(*) FROM expression WHERE sample_id = ?", 
+                [sample_id]
+            ).fetchone()[0]
+            
+            self.logger.info(f"Loaded {expression_loaded} expression records for {sample_id}")
+            return expression_loaded
+            
+        except Exception as e:
+            self.logger.error(f"Error loading expression data: {e}")
+            raise
+    
     def process_sample(self, sample_id: str) -> ProcessingResult:
         """Process a single sample: fetch metadata and load sequence data."""
         try:
@@ -449,14 +491,14 @@ class SequenceDBBuilder:
                         metadata.get('study_abstract'),
                         metadata.get('bioproject'),
                         metadata.get('biosample'),
-                        metadata.get('library', {}).get('strategy'),
-                        metadata.get('library', {}).get('source'),
-                        metadata.get('library', {}).get('selection'),
-                        metadata.get('library', {}).get('layout'),
+                        metadata.get('library_strategy'),
+                        metadata.get('library_source'),
+                        metadata.get('library_selection'),
+                        metadata.get('library_layout'),
                         metadata.get('instrument'),
-                        metadata.get('run', {}).get('spots'),
-                        metadata.get('run', {}).get('bases'),
-                        metadata.get('run', {}).get('published')
+                        metadata.get('run_spots'),
+                        metadata.get('run_bases'),
+                        metadata.get('run_published')
                     ])
                 
                 # Load sequences
@@ -470,10 +512,17 @@ class SequenceDBBuilder:
                 else:
                     self.logger.warning(f"No annotation file found: {paths.annotations}")
                 
-                return sequences_loaded, annotations_loaded, duplicates
+                # Load expression data if available
+                expression_loaded = 0
+                if paths.expression.exists():
+                    expression_loaded = self._load_expression(paths.expression, sample_id)
+                else:
+                    self.logger.warning(f"No expression file found: {paths.expression}")
+                
+                return sequences_loaded, annotations_loaded, expression_loaded, duplicates
 
             # Execute everything in a single transaction
-            sequences_loaded, annotations_loaded, duplicates = self.execute_transaction(_process)
+            sequences_loaded, annotations_loaded, expression_loaded, duplicates = self.execute_transaction(_process)
             
             return ProcessingResult(
                 sample_id=sample_id,
@@ -627,6 +676,7 @@ class SequenceDBBuilder:
             COUNT(DISTINCT CASE WHEN a.seqhash_id IS NOT NULL THEN s.seqhash_id END) as annotated_sequences,
             COUNT(DISTINCT CASE WHEN g.seqhash_id IS NOT NULL THEN s.seqhash_id END) as sequences_with_go,
             COUNT(DISTINCT CASE WHEN e.seqhash_id IS NOT NULL THEN s.seqhash_id END) as sequences_with_ec,
+            COUNT(DISTINCT CASE WHEN expr.seqhash_id IS NOT NULL THEN s.seqhash_id END) as sequences_with_expression,
             COUNT(DISTINCT c.cluster_id) as total_clusters,
             ROUND(AVG(s.length), 2) as avg_sequence_length,
             MIN(s.length) as min_sequence_length,
@@ -635,6 +685,7 @@ class SequenceDBBuilder:
         LEFT JOIN annotations a ON s.seqhash_id = a.seqhash_id
         LEFT JOIN go_terms g ON s.seqhash_id = g.seqhash_id
         LEFT JOIN ec_numbers e ON s.seqhash_id = e.seqhash_id
+        LEFT JOIN expression expr ON s.seqhash_id = expr.seqhash_id
         LEFT JOIN cluster_members cm ON s.seqhash_id = cm.seqhash_id
         LEFT JOIN clusters c ON cm.cluster_id = c.cluster_id
         """
