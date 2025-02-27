@@ -155,9 +155,9 @@ class TestDuckDBCreation(unittest.TestCase):
             # Create test sequence data
             sequences_table = """
             INSERT INTO sequences VALUES
-            ('v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c.p1', 'ACTG', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4),
-            ('v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace.p1', 'GGCC', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4),
-            ('v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf.p1', 'AATT', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4);
+            ('v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c.p1', 'ACTG', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 'v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c.p1', 4),
+            ('v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace.p1', 'GGCC', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 'v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace.p1', 4),
+            ('v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf.p1', 'AATT', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 'v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf.p1', 4);
             """
             
             # Create gene-protein mapping data
@@ -246,6 +246,7 @@ class TestDuckDBCreation(unittest.TestCase):
                 sample_id VARCHAR NOT NULL,
                 assembly_date TIMESTAMP,
                 is_representative BOOLEAN DEFAULT FALSE,
+                repseq_id VARCHAR NOT NULL,
                 length INTEGER
             );
             
@@ -269,9 +270,9 @@ class TestDuckDBCreation(unittest.TestCase):
         # Insert test protein sequences
         con.execute("""
             INSERT INTO sequences VALUES
-            ('v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c.p1', 'ACTG', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4),
-            ('v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace.p1', 'GGCC', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4),
-            ('v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf.p1', 'AATT', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4);
+            ('v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c.p1', 'ACTG', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 'v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c.p1', 4),
+            ('v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace.p1', 'GGCC', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 'v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace.p1', 4),
+            ('v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf.p1', 'AATT', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 'v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf.p1', 4);
         """)
         
         # Insert gene-protein mappings
@@ -396,12 +397,12 @@ class TestDuckDBCreation(unittest.TestCase):
                     )
                 """)
                 
-                # Insert protein sequences
+                # Insert protein sequences with repseq_id
                 builder.con.execute("""
                     INSERT INTO sequences VALUES
-                    ('v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c.p1', 'ACTG', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4),
-                    ('v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace.p1', 'GGCC', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4),
-                    ('v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf.p1', 'AATT', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4);
+                    ('v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c.p1', 'ACTG', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 'v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c.p1', 4),
+                    ('v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace.p1', 'GGCC', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 'v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace.p1', 4),
+                    ('v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf.p1', 'AATT', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 'v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf.p1', 4);
                 """)
                 
                 # Insert gene-protein mapping

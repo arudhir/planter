@@ -131,6 +131,10 @@ class TestSequenceDBBuilder(unittest.TestCase):
             sequences = builder.con.execute("SELECT * FROM sequences").fetchall()
             self.assertEqual(len(sequences), 2)
             
+            # Verify the repseq_id field is populated correctly
+            for seq in sequences:
+                self.assertIsNotNone(seq[5], "repseq_id should not be None")
+            
             # Verify annotations were loaded
             annotations = builder.con.execute("SELECT * FROM annotations").fetchall()
             self.assertEqual(len(annotations), 2)

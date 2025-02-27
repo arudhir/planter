@@ -226,6 +226,7 @@ class SequenceDBBuilder:
                     'sample_id': sample_id,
                     'assembly_date': datetime.now(),
                     'is_representative': False,
+                    'repseq_id': protein_seqhash_id,  # initialize the repseq_id to be the same as seqhash_id
                     'length': len(record.seq)
                 })
                 
@@ -234,9 +235,6 @@ class SequenceDBBuilder:
                     'gene_seqhash_id': gene_seqhash_id,
                     'protein_seqhash_id': protein_seqhash_id
                 })
-                
-                # Add repseq_id field from repseq branch
-                sequences[-1]['repseq_id'] = protein_seqhash_id  # initialize the repseq_id to be the same as seqhash_id
                 
                 sequences_loaded += 1
                 
