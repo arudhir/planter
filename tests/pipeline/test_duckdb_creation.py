@@ -274,8 +274,142 @@ class TestDuckDBCreation(unittest.TestCase):
         self.assertAlmostEqual(first_row[2], 103387.45)
         self.assertAlmostEqual(first_row[3], 1824.11)
         
+        # Run some expression statistics queries
+        # 1. Get TPM summary statistics
+        tpm_stats = con.execute("""
+            SELECT 
+                MIN(tpm) as min_tpm,
+                MAX(tpm) as max_tpm,
+                AVG(tpm) as avg_tpm,
+                MEDIAN(tpm) as median_tpm
+            FROM expression
+        """).fetchone()
+        
+        print(f"TPM Stats: Min={tpm_stats[0]}, Max={tpm_stats[1]}, Avg={tpm_stats[2]}, Median={tpm_stats[3]}")
+        self.assertGreater(tpm_stats[1], 0, "Max TPM should be greater than 0")
+        
+        # 2. Get expression distribution statistics
+        expr_distrib = con.execute("""
+            SELECT
+                CASE 
+                    WHEN tpm < 1 THEN 'Low (<1 TPM)'
+                    WHEN tpm < 10 THEN 'Medium (1-10 TPM)'
+                    WHEN tpm < 100 THEN 'High (10-100 TPM)'
+                    ELSE 'Very High (>100 TPM)'
+                END as expression_level,
+                COUNT(*) as seq_count
+            FROM expression
+            GROUP BY expression_level
+            ORDER BY seq_count DESC
+        """).df()
+        print(f"Expression distribution:\n{expr_distrib}")
+        
         # Close the connection
         con.close()
+    
+    def test_database_query_statistics(self):
+        """Test querying and analyzing expression data statistics."""
+        import duckdb
+        import pandas as pd
+        from pathlib import Path
+        
+        # Set up a database with our test data
+        from planter.database.builder import SequenceDBBuilder
+        
+        # Create a fresh database for this test
+        db_path = self.output_dir / 'expr_stats.duckdb'
+        
+        with SequenceDBBuilder(str(db_path), output_dir=str(self.output_dir)) as builder:
+            # Initialize the database schema
+            builder.init_database()
+            
+            # Insert metadata and sequence data
+            with builder.transaction():
+                # Insert metadata
+                builder.con.execute("""
+                    INSERT INTO sra_metadata (
+                        sample_id, organism, study_title, study_abstract
+                    ) VALUES (
+                        'SRR12068547', 'Mesoplasma florum', 'Test Study', 'Abstract'
+                    )
+                """)
+                
+                # Insert sequences
+                builder.con.execute("""
+                    INSERT INTO sequences VALUES
+                    ('v1_DLS_1326316412ebf3de1b3287ad9d63156b914d59fac8091a0ace01b5460d43e49c', 'ACTG', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4),
+                    ('v1_DLS_bdfe3e5075584cd087ebd251e8ccdb41d07f712fef6076743611cc829c909ace', 'GGCC', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4),
+                    ('v1_DLS_6f6388f460dca325a7c0c54982c1f0a2e701b872afcf81d06fb166db02ef64cf', 'AATT', 'SRR12068547', CURRENT_TIMESTAMP, FALSE, 4);
+                """)
+            
+            # Load expression data directly
+            quant_path = Path(self.output_dir) / self.sample_id / 'quants' / f'{self.sample_id}.quant.json'
+            builder._load_expression(quant_path, self.sample_id)
+            
+            # Get database summary
+            summary = builder.get_database_summary()
+            print(f"Database summary:\n{summary}")
+            
+            # Verify that expression data is reported in the summary
+            self.assertEqual(summary['sequences_with_expression'].values[0], 3, 
+                            "Expected 3 sequences with expression data")
+            
+            # Query expression data by TPM thresholds
+            expr_query = """
+            SELECT 
+                CASE 
+                    WHEN tpm < 1 THEN 'Low (<1 TPM)'
+                    WHEN tpm < 10 THEN 'Medium (1-10 TPM)'
+                    WHEN tpm < 100 THEN 'High (10-100 TPM)'
+                    ELSE 'Very High (>100 TPM)'
+                END as expression_level,
+                COUNT(*) as count
+            FROM expression
+            GROUP BY expression_level
+            ORDER BY 
+                CASE 
+                    WHEN expression_level = 'Low (<1 TPM)' THEN 1
+                    WHEN expression_level = 'Medium (1-10 TPM)' THEN 2
+                    WHEN expression_level = 'High (10-100 TPM)' THEN 3
+                    ELSE 4
+                END
+            """
+            
+            expr_stats = builder.con.execute(expr_query).df()
+            print(f"Expression level distribution:\n{expr_stats}")
+            
+            # Test expression correlation with sequence length
+            corr_query = """
+            SELECT 
+                CORR(s.length, e.tpm) as length_tpm_correlation
+            FROM sequences s
+            JOIN expression e ON s.seqhash_id = e.seqhash_id
+            """
+            
+            # This will fail in our test since we're using fixed length sequences,
+            # but it demonstrates the kind of analysis you could do
+            try:
+                corr = builder.con.execute(corr_query).fetchone()[0]
+                print(f"Correlation between sequence length and TPM: {corr}")
+            except Exception as e:
+                print(f"Correlation query failed (expected in test): {e}")
+            
+            # Get top expressed sequences
+            top_expr_query = """
+            SELECT 
+                s.seqhash_id,
+                e.tpm,
+                e.num_reads,
+                s.length
+            FROM sequences s
+            JOIN expression e ON s.seqhash_id = e.seqhash_id
+            ORDER BY e.tpm DESC
+            LIMIT 5
+            """
+            
+            top_expr = builder.con.execute(top_expr_query).df()
+            print(f"Top expressed sequences:\n{top_expr}")
+            self.assertEqual(len(top_expr), 3, "Expected 3 sequences in result")
 
 
 if __name__ == '__main__':
