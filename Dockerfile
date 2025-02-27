@@ -195,6 +195,13 @@ WORKDIR ${TOOLS}
 RUN wget https://github.com/shenwei356/seqkit/releases/download/v2.9.0/seqkit_linux_amd64.tar.gz \
     && tar xvf seqkit_linux_amd64.tar.gz
 
+###############
+### DuckDB ###
+###############
+WORKDIR ${TOOLS}
+RUN wget https://github.com/duckdb/duckdb/releases/download/v1.2.0/duckdb_cli-linux-amd64.zip \
+    && unzip duckdb_cli-linux-amd64.zip \
+    && rm duckdb_cli-linux-amd64.zip
 
 ### Set PATH and do some extraneous steps
 ENV PATH=/:/usr/src/planter/planter:/tools/ntHits-ntHits-v0.0.1/:/tools/minimap2:/tools/racon/build/bin:/tools/ntEdit/:/tools/racon-v1.3.1/build/bin:/tools/augustus-3.3.2/bin:/tools/augustus-3.3.2/bin/scripts:/tools/ncbi-blast-2.9.0+/bin:/tools/Flye/bin:/tools/prokka-1.14.0/bin/:/tools/barrnap-0.8/bin:/tools/bbmap:/tools/bowtie2-2.3.2/:/tools/SPAdes-4.0.0-Linux/bin:/tools/Filtlong/bin:/tools/canu-1.8/Linux-amd64/bin:/tools:/usr/bin:/tools/SKESA:/tools/miniasm/:/tools/seqtk:/tools/quast-5.0.2:/tools/minigraph:/tools/SPAdes-3.13.0-Linux/bin:$PATH:/tools/mmseqs/bin/:/tools/sratoolkit.3.1.1-ubuntu64/bin:/tools/TransDecoder-TransDecoder-v5.7.1/:/tools/eggnog-mapper:/tools/mmseqs/bin/:$PATH

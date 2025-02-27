@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS sequences (
     sample_id VARCHAR NOT NULL,
     assembly_date TIMESTAMP NOT NULL,
     is_representative BOOLEAN NOT NULL DEFAULT FALSE,
+    repseq_id VARCHAR NOT NULL,  -- new column to track the representative sequence
     length INTEGER NOT NULL,
     FOREIGN KEY (sample_id) REFERENCES sra_metadata(sample_id)
 );

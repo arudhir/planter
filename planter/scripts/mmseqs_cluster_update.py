@@ -266,7 +266,9 @@ class BatchMMseqsUpdater:
         
         for i, file in enumerate(files, start=1):
             srr_id = self._get_srr_id(file)
-            output_dir = os.path.join(self.base_output_dir, f"update_{srr_id}")
+            # output_dir = os.path.join(self.base_output_dir, f"update_{srr_id}")
+            # output_dir = self.base_output_dir + f'_{i}'
+            output_dir = self.base_output_dir
             logging.info(f"\nProcessing file {i}/{len(files)}: {srr_id}")
             
             updater = MMseqsClusterUpdater(output_dir)
@@ -307,6 +309,10 @@ def main():
                        help='Initial old representative sequences file')
     args = parser.parse_args()
     
+    # if Path(args.output_dir).exists():
+    #     print("Removing existing output directory: ", args.output_dir)
+    #     shutil.rmtree(args.output_dir)
+
     batch_updater = BatchMMseqsUpdater(
         files=args.files,
         base_output_dir=args.output_dir,

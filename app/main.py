@@ -1,27 +1,33 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, current_app
 import subprocess
 import tempfile
 import os
 import logging
 from pathlib import Path
+import pandas as pd
+import duckdb
 from app.config import config
 from planter.database.query_manager import DatabaseManager
 
 def create_app(config_name='default'):
+    """Creates and configures the Flask app."""
     app = Flask(__name__)
     app.config.from_object(config[config_name])
     logging.basicConfig(level=logging.DEBUG)
 
     @app.route('/', methods=['GET', 'POST'])
     def index():
+        """Handles the main search page."""
         if request.method == 'POST':
             sequence = request.form['sequence']
-            results = run_mmseqs2_easy_search(sequence)
+            # import ipdb; ipdb.set_trace()
+            results = process_search_request(sequence, app.config['REPSEQ_FASTA'], app.config['DUCKDB_PATH'])
             return render_template('results.html', results=results)
         return render_template('index.html')
 
     @app.route('/load_example', methods=['GET'])
     def load_example():
+        """Loads an example sequence from a file."""
         try:
             with open(app.config['EXAMPLE_FASTA'], 'r') as f:
                 example_sequence = f.read().strip()
@@ -107,107 +113,163 @@ def create_app(config_name='default'):
         except Exception as e:
             app.logger.error(f"Database error: {e}")
             return {}
-
-    def run_mmseqs2_easy_search(sequence):
-        app.logger.debug(f"Starting MMSeqs2 search with sequence: {sequence}")
-        
-        with tempfile.TemporaryDirectory() as temp_dir:
-            tmp_dir = Path(temp_dir)
-            input_file = tmp_dir / "input.fasta"
-            output_file = tmp_dir / "output.tsv"
-            mmseqs_tmp = tmp_dir / "tmp"
-            
-            with open(input_file, 'w') as f:
-                f.write(f">query\n{sequence}\n")
-            
-            try:
-                # Check if MMSEQS_DB is accessible
-                if not os.path.exists(app.config['MMSEQS_DB']):
-                    app.logger.error(f"MMSeqs database not found at: {app.config['MMSEQS_DB']}")
-                    return {'headers': ['Error'], 'data': [{'Error': f"MMSeqs database not found or inaccessible. Please check configuration."}]}
-                
-                mmseqs_command = [
-                    "mmseqs", "easy-search", str(input_file), app.config['MMSEQS_DB'], 
-                    str(output_file), str(mmseqs_tmp),
-                    "--format-output", "query,target,pident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,tseq"
-                ]
-                
-                try:
-                    process_result = subprocess.run(mmseqs_command, capture_output=True, text=True, check=True)
-                    app.logger.debug(f"MMSeqs2 stdout: {process_result.stdout}")
-                    app.logger.debug(f"MMSeqs2 stderr: {process_result.stderr}")
-                except subprocess.CalledProcessError as e:
-                    app.logger.error(f"MMSeqs2 search failed: {e}")
-                    app.logger.error(f"Command output: {e.stdout}")
-                    app.logger.error(f"Command error: {e.stderr}")
-                    return {'headers': ['Error'], 'data': [{'Error': f"MMSeqs2 search failed: {str(e)}"}]}
-                
-                if output_file.exists():
-                    try:
-                        with open(output_file, 'r') as f:
-                            results = f.read().splitlines()
-                        
-                        if not results:
-                            app.logger.warning("MMSeqs2 returned empty results")
-                            return {'headers': ['Message'], 'data': [{'Message': "No similar sequences found in the database."}]}
-                        
-                        # Parse MMSeqs2 results
-                        headers = ['query', 'target', 'pident', 'alnlen', 'mismatch', 'gapopen', 
-                                 'qstart', 'qend', 'tstart', 'tend', 'evalue', 'bits', 'tseq']
-                        parsed_results = []
-                        
-                        for row in results:
-                            try:
-                                fields = row.split('\t')
-                                if len(fields) != len(headers):
-                                    app.logger.warning(f"Skipping malformed result row: {row}")
-                                    continue
-                                parsed_results.append(dict(zip(headers, fields)))
-                            except Exception as row_error:
-                                app.logger.error(f"Error parsing MMSeqs2 result row: {row_error}")
-                                continue
-                        
-                        if not parsed_results:
-                            return {'headers': ['Message'], 'data': [{'Message': "Could not parse any search results."}]}
-                        
-                        # Get target sequence IDs
-                        seqhash_ids = [row['target'] for row in parsed_results]
-                        app.logger.debug(f"Searching for seqhash_ids: {seqhash_ids}")
-                        
-                        # Get comprehensive sequence information using the canonical query
-                        sequence_details = get_sequence_details(seqhash_ids)
-                        
-                        # Merge MMSeqs2 results with detailed sequence information
-                        merged_results = []
-                        for result in parsed_results:
-                            target_id = result['target']
-                            details = sequence_details.get(target_id, {})  # Get sequence details or default to empty dict
-                            result.update(details)  # Add all sequence details to the result
-                            merged_results.append(result)
-
-                        # Define desired display order for headers
-                        desired_headers = [
-                            'query', 'target', 'pident', 'alnlen', 'evalue', 'bits',
-                            'preferred_name', 'description', 'organism', 
-                            # 'tpm', 'gene_id',  # Expression data temporarily disabled
-                            'cog_category', 'go_terms', 'ec_numbers', 'kegg_pathway', 'kegg_ko',
-                            'qstart', 'qend', 'tstart', 'tend', 'mismatch', 'gapopen', 'tseq'
-                        ]
-                        
-                        # Filter to headers that are actually present in the results
-                        headers = [h for h in desired_headers if any(h in d for d in merged_results)]
-                        return {'headers': headers, 'data': merged_results}
-                    except Exception as parse_error:
-                        app.logger.error(f"Error parsing MMSeqs2 results: {parse_error}")
-                        return {'headers': ['Error'], 'data': [{'Error': f"Error parsing search results: {str(parse_error)}"}]}
-                else:
-                    return {'headers': ['Error'], 'data': [{'Error': "MMSeqs2 did not produce output file"}]}
-                    
-            except Exception as e:
-                app.logger.error(f"Error: {e}")
-                return {'headers': ['Error'], 'data': [{'Error': str(e)}]}
-
     return app
+
+
+import pandas as pd
+
+def run_mmseqs2_search(sequence, db_path):
+    """Runs MMSeqs2 search and returns parsed results as a DataFrame."""
+    current_app.logger.debug(f"Running MMSeqs2 search with sequence: {sequence}")
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        input_file = os.path.join(temp_dir, "input.fasta")
+        output_file = os.path.join(temp_dir, "output.tsv")
+        tmp_dir = os.path.join(temp_dir, "tmp")
+
+        with open(input_file, 'w') as f:
+            f.write(f">query\n{sequence}\n")
+
+        mmseqs_command = [
+            "mmseqs", "easy-search", input_file, db_path, output_file, tmp_dir,
+            "--format-output", "query,target,pident,alnlen,mismatch,gapopen,qstart,qend,tstart,tend,evalue,bits,tseq"
+        ]
+
+        process = subprocess.run(mmseqs_command, capture_output=True, text=True)
+        if process.returncode != 0:
+            current_app.logger.error(f"MMSeqs2 Error: {process.stderr}")
+            return pd.DataFrame(), f"MMSeqs2 failed: {process.stderr}"
+
+        if not os.path.exists(output_file):
+            return pd.DataFrame(), "MMSeqs2 did not produce an output file"
+
+        df = pd.read_csv(output_file, sep='\t', names=[
+            'query', 'target', 'pident', 'alnlen', 'mismatch', 'gapopen', 
+            'qstart', 'qend', 'tstart', 'tend', 'evalue', 'bits', 'tseq'
+        ])
+        
+    return df, None
+
+def fetch_annotations_and_clusters(seqhash_ids, db_path):
+    """Fetch annotations and cluster info from DuckDB."""
+    if not seqhash_ids:
+        return pd.DataFrame(), pd.DataFrame()  # return empty dfs if no input
+
+    try:
+        with duckdb.connect(db_path) as db:
+            # fetch annotations
+            annotations_query = f"""
+                SELECT s.seqhash_id AS target, s.sample_id, m.organism, 
+                       a.description, a.cog_category, a.preferred_name
+                FROM sequences s
+                JOIN sra_metadata m ON s.sample_id = m.sample_id
+                LEFT JOIN annotations a ON s.seqhash_id = a.seqhash_id
+                WHERE s.seqhash_id IN ({','.join([f"'{x}'" for x in seqhash_ids])})
+            """
+            annotations_df = db.execute(annotations_query).fetchdf()
+
+            # fetch clusters
+            cluster_query = f"""
+                SELECT ANY_VALUE(cm.seqhash_id) AS target, 
+                    cm.cluster_id, 
+                    GROUP_CONCAT(cm.seqhash_id, ';') AS cluster_members, 
+                    COUNT(*) AS cluster_size
+                FROM cluster_members cm
+                WHERE cm.seqhash_id IN ({','.join([f"'{x}'" for x in seqhash_ids])})
+                GROUP BY cm.cluster_id
+            """
+            cluster_df = db.execute(cluster_query).fetchdf()
+
+        return annotations_df, cluster_df
+
+    except Exception as e:
+        current_app.logger.error(f"Database error: {e}")
+        return pd.DataFrame(), pd.DataFrame()
+
+import pandas as pd
+
+def merge_results_with_metadata(parsed_results, annotations, cluster_info):
+    """Merges MMSeqs2 results with annotations, organism/sample_id, and cluster data."""
+    if not parsed_results:
+        return []
+
+    mmseqs_df = pd.DataFrame(parsed_results)  # Convert MMSeqs2 results into a DataFrame
+
+    if annotations.empty:
+        annotations = pd.DataFrame(columns=['target', 'organism', 'sample_id', 'description', 'cog_category', 'preferred_name'])
+    if cluster_info.empty:
+        cluster_info = pd.DataFrame(columns=['target', 'cluster_size', 'cluster_members'])
+
+    # Merge annotations
+    # import ipdb; ipdb.set_trace()
+    merged_df = mmseqs_df.merge(annotations, on='target', how='left')
+
+    # Merge cluster information
+    merged_df = merged_df.merge(cluster_info, on='target', how='left')
+
+    # Fill missing values
+    merged_df.fillna({
+        'organism': 'Unknown',
+        'sample_id': 'Unknown',
+        'description': 'No annotation',
+        'cog_category': None,
+        'preferred_name': None,
+        'cluster_size': 1,
+        'cluster_members': ''
+    }, inplace=True)
+
+    return merged_df.to_dict(orient='records')  # Convert back to list of dictionaries
+
+def process_search_request(sequence, fasta_path, duckdb_path):
+    """Handles the entire search process and merges MMSeqs2 results with metadata."""
+    mmseqs_df, error = run_mmseqs2_search(sequence, fasta_path)
+    if error:
+        return {'headers': ['Error'], 'data': [{'Error': error}]}
+
+    if mmseqs_df.empty:
+        return {'headers': ['Error'], 'data': [{'Error': "No results found"}]}
+
+    # Debugging breakpoint to inspect mmseqs_df
+    # import ipdb; ipdb.set_trace()
+
+    # Get sequence ids from mmseqs results
+    seqhash_ids = mmseqs_df['target'].unique().tolist()
+
+    # Fetch annotations and clusters from duckdb
+    annotations_df, cluster_df = fetch_annotations_and_clusters(seqhash_ids, duckdb_path)
+
+    # Debugging breakpoint before merge
+    # ipdb.set_trace()
+
+    # Merge annotations
+    merged_df = mmseqs_df.merge(annotations_df, on='target', how='left')
+
+    # Merge clusters
+    merged_df = merged_df.merge(cluster_df, on='target', how='left').dropna()
+
+    # Fill missing values
+    # merged_df.fillna({
+    #     'organism': 'Unknown',
+    #     'sample_id': 'Unknown',
+    #     'description': 'No annotation',
+    #     'cog_category': None,
+    #     'preferred_name': None,
+    #     'cluster_size': 1,
+    #     'cluster_members': ''
+    # }, inplace=True)
+
+    desired_headers = [
+        'query', 'organism', 'sample_id', 'preferred_name', 'target',  'description', 'tseq',
+        'cluster_members', 'cog_category',
+        'pident', 'alnlen', 'mismatch', 'gapopen', 
+        'qstart', 'qend', 'tstart', 'tend', 'evalue', 'bits', 
+        'cluster_size'
+    ]
+    
+    
+    headers = [h for h in desired_headers if h in merged_df.columns]
+    return {'headers': headers, 'data': merged_df.to_dict(orient='records')}
+
 
 if __name__ == '__main__':
     app = create_app('development')

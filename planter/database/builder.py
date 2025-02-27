@@ -235,6 +235,9 @@ class SequenceDBBuilder:
                     'protein_seqhash_id': protein_seqhash_id
                 })
                 
+                # Add repseq_id field from repseq branch
+                sequences[-1]['repseq_id'] = protein_seqhash_id  # initialize the repseq_id to be the same as seqhash_id
+                
                 sequences_loaded += 1
                 
                 if len(sequences) % 1000 == 0:

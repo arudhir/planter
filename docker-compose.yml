@@ -7,6 +7,7 @@ services:
     tty: True
     environment:
       - TMPDIR=/mnt/data3/tmp
+      - SNAKEMAKE_STORAGE_DIR=/mnt/data3/.snakemake_storage
     volumes:
       - ./planter/workflow:/planter/workflow
       - ./tests:/usr/src/planter/tests
@@ -15,5 +16,6 @@ services:
       - /mnt/data:/mnt/data
       # - ./outputs:/usr/src/planter/outputs
       - /mnt/data3/planter_outputs:/usr/src/planter/outputs
+      #- /mnt/data2/planter_outputs:/usr/src/planter/outputs
       - /mnt/data3/tmp:/tmp
       - ~/.aws:/root/.aws
