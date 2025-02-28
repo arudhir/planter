@@ -54,19 +54,20 @@ class TestSequenceDBBuilder(unittest.TestCase):
         """Create test files for the database builder."""
         # Create a sample pep file
         with open(self.transdecoder_dir / f"{self.sample_id}.pep", "w") as f:
-            f.write(">v1_DLS_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef\n")
+            f.write(">v1_DLS_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef.p1\n")
             f.write("MEPKSLYVGDLHGAFYSIWKLVKSENDNRYLLLVDLNEKIAEMIFNLHGKLDVLSQLPQKK\n")
-            f.write(">v1_DLS_0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba\n")
+            f.write(">v1_DLS_0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba.p1\n")
             f.write("MARNVLNAIDVLSRLETHLNGLIRLAVDKMDLSEVITSLPKMRRSFSENLNQLTKRVQEL\n")
         
         # Create a sample eggnog annotations file
         with open(self.eggnog_dir / f"{self.sample_id}.emapper.annotations", "w") as f:
             f.write("# eggNOG-mapper - orthology assignment, gene annotation and functional interpretation\n")
             f.write("# emapper version: 2.1.6\n")
-            f.write("v1_DLS_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef\t-\t1e-10\t100.0\t-\t-\t-\tHypothetical protein\t-\tGO:0008150,GO:0003674,GO:0005575\tec:1.1.1.1\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\n")
-            f.write("v1_DLS_0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba\t-\t1e-5\t80.0\t-\t-\t-\tAnother protein\t-\tGO:0016491\tec:2.2.2.2\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\n")
+            f.write("v1_DLS_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef.p1\t-\t1e-10\t100.0\t-\t-\t-\tHypothetical protein\t-\tGO:0008150,GO:0003674,GO:0005575\tec:1.1.1.1\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\n")
+            f.write("v1_DLS_0987654321fedcba0987654321fedcba0987654321fedcba0987654321fedcba.p1\t-\t1e-5\t80.0\t-\t-\t-\tAnother protein\t-\tGO:0016491\tec:2.2.2.2\t-\t-\t-\t-\t-\t-\t-\t-\t-\t-\n")
         
         # Create a sample quant.json file
+        # Note: for expression data, we use the gene ID (without .p1)
         quant_data = [
             {
                 "Name": "v1_DLS_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
@@ -161,6 +162,20 @@ class TestSequenceDBBuilder(unittest.TestCase):
             self.assertAlmostEqual(expr[0], 10.5)  # TPM
             self.assertAlmostEqual(expr[1], 100.0)  # NumReads
             self.assertAlmostEqual(expr[2], 58.12)  # EffectiveLength
+            
+            # Verify gene_protein_map table was properly populated
+            gene_protein_maps = builder.con.execute("SELECT * FROM gene_protein_map").fetchall()
+            self.assertEqual(len(gene_protein_maps), 2, "Should have two entries in gene_protein_map")
+            
+            # Verify mapping for the first sequence
+            gene_protein_map = builder.con.execute("""
+                SELECT gene_seqhash_id, protein_seqhash_id 
+                FROM gene_protein_map 
+                WHERE gene_seqhash_id = ?
+            """, ["v1_DLS_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"]).fetchone()
+            
+            self.assertEqual(gene_protein_map[0], "v1_DLS_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")
+            self.assertEqual(gene_protein_map[1], "v1_DLS_1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef.p1")
 
     @patch('planter.database.builder.get_sra_info')
     def test_database_summary(self, mock_get_sra_info):

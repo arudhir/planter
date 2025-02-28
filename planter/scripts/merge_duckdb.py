@@ -74,6 +74,46 @@ def merge_databases(add_db: str, output_db: str):
             SELECT * FROM new_sample.cluster_members;
         """)
         
+        # Check if gene_protein_map table exists in both databases
+        gene_protein_map_exists = con.execute("""
+            SELECT COUNT(*) FROM sqlite_master 
+            WHERE type='table' AND name='gene_protein_map'
+        """).fetchone()[0]
+        
+        gene_protein_map_exists_in_new = con.execute("""
+            SELECT COUNT(*) FROM new_sample.sqlite_master 
+            WHERE type='table' AND name='gene_protein_map'
+        """).fetchone()[0]
+        
+        if gene_protein_map_exists and gene_protein_map_exists_in_new:
+            print("Merging gene_protein_map...")
+            con.execute("""
+                INSERT INTO gene_protein_map
+                SELECT * FROM new_sample.gene_protein_map
+                WHERE gene_seqhash_id NOT IN (SELECT gene_seqhash_id FROM gene_protein_map);
+            """)
+        
+        # Check if expression table exists in both databases
+        expression_exists = con.execute("""
+            SELECT COUNT(*) FROM sqlite_master 
+            WHERE type='table' AND name='expression'
+        """).fetchone()[0]
+        
+        expression_exists_in_new = con.execute("""
+            SELECT COUNT(*) FROM new_sample.sqlite_master 
+            WHERE type='table' AND name='expression'
+        """).fetchone()[0]
+        
+        if expression_exists and expression_exists_in_new:
+            print("Merging expression data...")
+            con.execute("""
+                INSERT INTO expression
+                SELECT * FROM new_sample.expression
+                WHERE (gene_seqhash_id, sample_id) NOT IN (
+                    SELECT gene_seqhash_id, sample_id FROM expression
+                );
+            """)
+        
         con.execute("COMMIT")
         print("Merge completed successfully.")
     except Exception as e:
