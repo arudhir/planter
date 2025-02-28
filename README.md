@@ -267,6 +267,38 @@ Flask app in `app/`, `python app/main.py`
 ![simplified-vision](images/simplified-vision.png "simplified-vision")
 ![schema](images/schema.png "schema")
 
+# Tests
+
+The project includes comprehensive test suites for various components:
+
+## Database Utility Tests
+
+Located in `tests/database/utils/`:
+
+- **test_duckdb_utils.py**: Tests for database operations including:
+  - Database merging functionality (`test_merge_duckdbs`)
+  - Cluster information updating with MMSeqs2 TSV output (`test_update_duckdb_with_cluster_info`)
+  - Integration with real sample data (`test_with_simple_data`)
+  - End-to-end MMSeqs2 clustering integration (`test_mmseqs_integration`)
+
+- **test_s3_utils.py**: Tests for S3 interaction functionality:
+  - Creating zip archives (`test_create_zip_archive`)
+  - Uploading to S3 successfully (`test_upload_to_s3_success`)
+  - Handling files that already exist in S3 (`test_upload_to_s3_file_exists`)
+  - Handling upload errors (`test_upload_to_s3_error`)
+
+## Other Tests
+
+- **test_database_builder.py**: Tests for database construction from raw sequence data
+- **test_expression_queries.py**: Tests for querying expression data from the database
+- **test_schema_migrations.py**: Tests for database schema migrations
+- **test_sequence_search.py**: Tests for sequence search functionality
+
+Run tests with:
+```bash
+python -m pytest tests/
+```
+
 # TODO
 
 - [ x ] Write script that finalizes the output metadata
