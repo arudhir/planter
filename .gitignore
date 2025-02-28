@@ -6,3 +6,4 @@ __pycache__
 */mmseqs_tmp
 tests/fixtures/**/*.fq.gz
 planter.egg-info/
+test_out/
