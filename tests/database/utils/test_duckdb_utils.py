@@ -212,7 +212,7 @@ class TestDuckDBUtils(unittest.TestCase):
         
         # Check if the cluster_members table is updated
         result = con.execute("SELECT cluster_id FROM cluster_members WHERE seqhash_id = 'seq1'").fetchone()
-        self.assertEqual(result[0], "rep1")
+        self.assertEqual(result[0], "cluster1")  # It should keep the original cluster ID
         
         con.close()
 
