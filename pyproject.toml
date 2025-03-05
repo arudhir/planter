@@ -19,3 +19,8 @@ planter = "planter.cli:main"
 [tool.setuptools]
 packages = ["planter"]
 package-data = {"planter" = ["workflow/*", "workflow/rules/*"]}
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow (deselect with '-k \"not slow\"')",
+]

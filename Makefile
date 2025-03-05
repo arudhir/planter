@@ -109,10 +109,10 @@ deploy: image
 # --- Testing ---
 
 test:
-	python -m pytest tests/ -v
+	python -m pytest tests/ -v -k "not slow"
 
 test-all:
-	pytest --runslow --html=pytest-full.html --self-contained-html
+	python -m pytest tests/ -v
 	#
 # --- Running ---
 
