@@ -15,7 +15,8 @@ import pandas as pd
 from flask import Flask
 
 from planter.database.query_manager import QueryManager
-from app.main import create_app
+# Import local mock app instead of the actual app package
+from tests.database.app_mock import create_app
 
 class TestSequenceSearch(unittest.TestCase):
     """Test cases for sequence search functionality."""
@@ -34,10 +35,20 @@ class TestSequenceSearch(unittest.TestCase):
         self._create_test_database()
         
         # Create a test Flask app
-        self.app = create_app('development')
+        self.app = create_app('testing')
         self.app.config['TESTING'] = True
         self.app.config['DUCKDB_PATH'] = str(self.db_path)
-        self.app.config['EXAMPLE_FASTA'] = str(Path(__file__).parents[1] / 'test_enzymes.faa')
+        
+        # Use the existing test_enzymes.faa file
+        test_faa_path = str(Path(__file__).parents[1] / 'test_enzymes.faa')
+        if os.path.exists(test_faa_path):
+            self.app.config['EXAMPLE_FASTA'] = test_faa_path
+        else:
+            # If the file doesn't exist, create a temporary one
+            temp_faa = Path(self.temp_dir) / "test_enzymes.faa"
+            with open(temp_faa, 'w') as f:
+                f.write(">test_enzyme\nACTG\n")
+            self.app.config['EXAMPLE_FASTA'] = str(temp_faa)
         
         # Create a test client
         self.client = self.app.test_client()
@@ -105,7 +116,12 @@ class TestSequenceSearch(unittest.TestCase):
         self.assertEqual(data['error'], 'Failed to load example sequence')
         
         # Reset to valid path for other tests
-        self.app.config['EXAMPLE_FASTA'] = str(Path(__file__).parents[1] / 'test_enzymes.faa')
+        test_faa_path = str(Path(__file__).parents[1] / 'test_enzymes.faa')
+        if os.path.exists(test_faa_path):
+            self.app.config['EXAMPLE_FASTA'] = test_faa_path
+        else:
+            temp_faa = Path(self.temp_dir) / "test_enzymes.faa"
+            self.app.config['EXAMPLE_FASTA'] = str(temp_faa)
 
 
 if __name__ == '__main__':
