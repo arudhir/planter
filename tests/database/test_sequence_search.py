@@ -16,7 +16,7 @@ from flask import Flask
 
 from planter.database.query_manager import QueryManager
 # Import local mock app instead of the actual app package
-from tests.database.app_mock import create_app
+from .app_mock import create_app
 
 class TestSequenceSearch(unittest.TestCase):
     """Test cases for sequence search functionality."""
@@ -40,7 +40,7 @@ class TestSequenceSearch(unittest.TestCase):
         self.app.config['DUCKDB_PATH'] = str(self.db_path)
         
         # Use the existing test_enzymes.faa file
-        test_faa_path = str(Path(__file__).parents[1] / 'test_enzymes.faa')
+        test_faa_path = str(Path(__file__).parent.parent / 'test_enzymes.faa')
         if os.path.exists(test_faa_path):
             self.app.config['EXAMPLE_FASTA'] = test_faa_path
         else:
@@ -116,7 +116,7 @@ class TestSequenceSearch(unittest.TestCase):
         self.assertEqual(data['error'], 'Failed to load example sequence')
         
         # Reset to valid path for other tests
-        test_faa_path = str(Path(__file__).parents[1] / 'test_enzymes.faa')
+        test_faa_path = str(Path(__file__).parent.parent / 'test_enzymes.faa')
         if os.path.exists(test_faa_path):
             self.app.config['EXAMPLE_FASTA'] = test_faa_path
         else:
