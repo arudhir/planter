@@ -36,6 +36,19 @@ python -m pytest --cov=planter --cov-report=term tests/
 python -m pytest --cov=planter --cov-report=html tests/
 ```
 
+### Running Specific Test Categories
+
+```bash
+# Run only fast tests (skipping slow tests)
+python -m pytest tests/ -v -k "not slow"
+
+# Run only slow tests
+python -m pytest tests/ -v -k "slow"
+
+# Run only workflow tests
+python -m pytest tests/workflow/ -v
+```
+
 ## Test Structure
 
 The Planter codebase follows standard Python unittest practices:
@@ -132,6 +145,11 @@ Tests for database operations, schema management, and queries:
 
 Tests for the Snakemake workflow pipeline:
 - `tests/pipeline/test_duckdb_creation.py`
+
+### Workflow Tests
+
+End-to-end tests for the Snakemake workflow (marked as slow):
+- `tests/workflow/test_snakemake_workflow.py`
 
 ### Utility Tests
 
