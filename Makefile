@@ -145,12 +145,12 @@ lint:
 	mypy planter
 
 format:
-	black planter tests
-	isort planter tests
+	black planter "tests/database" "tests/pipeline" "tests/workflow"
+	isort planter "tests/database" "tests/pipeline" "tests/workflow"
 
 check:
-	black --check planter tests
-	isort --check planter tests
+	black --check planter "tests/database" "tests/pipeline" "tests/workflow"
+	isort --check planter "tests/database" "tests/pipeline" "tests/workflow"
 
 reformat: format lint check
 
