@@ -1,7 +1,10 @@
 .PHONY: \
 	help \
 	up image tag push bash \
-	test test-all \
+	test test-all test-verbose test-slow coverage \
+	format lint check reformat \
+	setup install-hooks \
+	dev-setup \
 	deploy \
 	clean clean-build clean-pyc \
 	dist release
@@ -19,31 +22,40 @@ CI_PROJECT_PATH ?= ngs-analysis/$(PROJECT_SLUG)
 APP_HOME ?= /usr/src/$(PROJECT_SLUG)
 
 help:
-	@echo
-	@echo "Usage: make [target]"
-	@echo "n.b., add -ext to run target in container"
-	@echo
-	@echo "Cleanup:"
-	@echo "    clean              clean-build, clean-docs, clean-node, clean-coverage, and clean-pyc"
-	@echo "    clean-build        remove build artifacts"
-	@echo "    clean-pyc          remove Python file artifacts"
-	@echo
-	@echo "Docker image:"
-	@echo "    up                 start the service"
-	@echo "    image              build the image"
-	@echo "    tag                tag the image"
-	@echo "    push               push the image to the docker registry"
-	@echo "    bash               start a bash shell inside the docker container"
+	@echo "Available targets:"
+	@echo "  setup        - Create virtual environment and install dependencies"
+	@echo "  clean        - Remove temporary files"
+	@echo "  lint         - Run linters"
+	@echo "  format       - Format code with Black and isort"
+	@echo "  check        - Check code style without modifying files"
+	@echo "  reformat     - Run format, check, and lint in sequence"
 	@echo
 	@echo "Testing:"
-	@echo "    test               run fast tests"
-	@echo "    test-all           run all tests"
+	@echo "  test         - Run fast tests"
+	@echo "  test-verbose - Run tests with verbose output"
+	@echo "  test-slow    - Run only slow tests"
+	@echo "  test-all     - Run all tests"
+	@echo "  coverage     - Run tests with coverage report"
+	@echo
+	@echo "Development:"
+	@echo "  install      - Install editable package"
+	@echo "  dev-setup    - Set up development environment with additional tools"
+	@echo "  install-hooks - Install git pre-commit hooks"
+	@echo
+	@echo "Docker:"
+	@echo "  image        - Build the image"
+	@echo "  up           - Start the service"
+	@echo "  tag          - Tag the image"
+	@echo "  push         - Push the image to the docker registry"
+	@echo "  bash         - Start a bash shell inside the docker container"
 	@echo
 	@echo "Packaging:"
-	@echo "    venv               create virtualenv"
-	@echo "    dist               create distribution"
-	@echo "    install            install editable package"
-	@echo "    release            release with twine"
+	@echo "  dist         - Create distribution"
+	@echo "  release      - Release with twine"
+	@echo
+	@echo "Common workflows:"
+	@echo "  make check test     - Validate code style and run tests"
+	@echo "  make reformat       - Format code and run linters"
 	#
 # --- External execution ---
 
@@ -106,13 +118,51 @@ deploy: image
 		docker.arudhir.com/$(CI_PROJECT_PATH)
 	@echo pushed planter image
 	
+# --- Setup ---
+
+setup:
+	python -m pip install --upgrade pip setuptools wheel
+	python -m pip install -e .
+	python -m pip install pytest pytest-cov black isort flake8 mypy pre-commit
+
+dev-setup: setup
+	python -m pip install ipython jupyter notebook build twine
+
+install-hooks:
+	pre-commit install
+
+# --- Code Quality ---
+
+lint:
+	flake8 planter
+	mypy planter
+
+format:
+	black planter tests
+	isort planter tests
+
+check:
+	black --check planter tests
+	isort --check planter tests
+
+reformat: format lint check
+
 # --- Testing ---
 
 test:
 	python -m pytest tests/ -v -k "not slow"
 
+test-verbose:
+	python -m pytest tests/ -vv -s -k "not slow"
+
+test-slow:
+	python -m pytest tests/ -v -k "slow"
+
 test-all:
 	python -m pytest tests/ -v
+
+coverage:
+	python -m pytest --cov=planter --cov-report=html --cov-report=term tests/ -k "not slow"
 	#
 # --- Running ---
 

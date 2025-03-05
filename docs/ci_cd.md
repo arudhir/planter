@@ -10,8 +10,8 @@ Planter uses GitHub Actions for Continuous Integration and Deployment. There are
 
 The CI workflow (`ci.yml`) runs on all pushes to the main branch and on all pull requests. It consists of the following jobs:
 
-1. **Test** - Runs all fast tests (excluding slow tests) on multiple Python versions:
-   - Python 3.8, 3.9, 3.10, 3.11, and 3.12
+1. **Test** - Runs all fast tests (excluding slow tests) on Python 3.12:
+   - Runs the tests with pytest
    - Generates and uploads code coverage reports
 
 2. **Lint** - Runs code quality checks:
