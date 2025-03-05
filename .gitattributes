@@ -2,3 +2,4 @@ tests/fixtures/* filter=lfs diff=lfs merge=lfs -text
 tests/fixtures/SRR12068547/SRR12068547/quants/aux_info/unmapped_names.txt filter=lfs diff=lfs merge=lfs -text
 tests/fixtures/SRR12068547/** filter=lfs diff=lfs merge=lfs -text
 tests/fixtures/SRR12068548/** filter=lfs diff=lfs merge=lfs -text
+tests/fixtures/id_checker.py filter=lfs diff=lfs merge=lfs -text
