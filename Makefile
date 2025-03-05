@@ -126,7 +126,7 @@ setup:
 	python -m pip install -e .
 	python -m pip install pytest pytest-cov black isort flake8 mypy pre-commit
 	# Ensure all required packages are explicitly installed
-	python -m pip install pandas numpy biopython pyyaml
+	python -m pip install pandas numpy biopython pyyaml flask
 
 install-requirements:
 	python -m pip install --upgrade pip setuptools wheel

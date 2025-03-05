@@ -15,6 +15,7 @@ dependencies = [
     "numpy",
     "biopython",
     "pyyaml",
+    "flask",
 ]
 
 [project.scripts]
