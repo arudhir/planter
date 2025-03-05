@@ -1,4 +1,5 @@
 import os
+import logging
 from pathlib import Path
 import duckdb
 from typing import List, Union
@@ -6,6 +7,10 @@ import pandas as pd
 
 from planter.database.utils.s3 import create_zip_archive, upload_to_s3
 from planter.database.utils.duckdb_utils import merge_duckdbs, update_duckdb_with_cluster_info
+from planter.database.schema.schema_version import get_db_schema_version, ensure_compatibility
+
+# Setup module logger
+logger = logging.getLogger(__name__)
 
 
 rule get_qc_stats:
@@ -64,7 +69,9 @@ rule update_database:
     params:
         canonical_db = "s3://recombia.planter/master.duckdb",
         tmp_dir = Path(config["outdir"]) / "tmp",
-        schema_path = Path('/usr/src/planter/planter/database/schema/migrations/001_initial_schema.sql')
+        schema_path = Path('/usr/src/planter/planter/database/schema/migrations/001_initial_schema.sql'),
+        # Target schema version (set to None to use latest available)
+        target_schema_version = None
     log:
         Path(config['outdir']) / 'logs' / 'update_database.log'
     run:
@@ -94,6 +101,16 @@ rule update_database:
             local_master = str(output.updated_master)
             logger.info(f"Creating local copy of master database at {local_master}")
             shutil.copy(str(input.master_db), local_master)
+            
+            # Check and ensure schema compatibility
+            schema_version, was_upgraded = ensure_compatibility(
+                local_master,
+                required_version=params.target_schema_version
+            )
+            if was_upgraded:
+                logger.info(f"Database schema was automatically upgraded to version {schema_version}")
+            else:
+                logger.info(f"Database schema version: {schema_version} (no upgrade needed)")
             
             # 1. Setup temp directory
             logger.info(f"Setting up temporary directory at {params.tmp_dir}")
@@ -135,13 +152,25 @@ rule update_database:
             clustering_time = time.time() - start_time
             logger.info(f"MMSeqs2 clustering completed in {clustering_time:.2f} seconds")
             
-            # 5. Merge sample DuckDBs into master DB
+            # 5. Merge sample DuckDBs into master DB with schema compatibility
             logger.info("Merging sample databases into master database")
             start_time = time.time()
+            
+            # Check schema versions of sample databases
+            sample_schema_versions = {}
+            for sample_db in input.duckdb:
+                sample_version = get_db_schema_version(sample_db)
+                sample_schema_versions[str(sample_db)] = sample_version
+                
+            logger.info(f"Sample database schema versions: {sample_schema_versions}")
+            
+            # Merge databases with schema compatibility
             master_db_path = merge_duckdbs(
                 duckdb_paths=input.duckdb,
                 master_db_path=local_master,
-                schema_sql_path=params.schema_path
+                schema_sql_path=params.schema_path,
+                upgrade_schema=True,
+                target_schema_version=params.target_schema_version
             )
             merge_time = time.time() - start_time
             logger.info(f"Database merge completed in {merge_time:.2f} seconds")
@@ -153,7 +182,12 @@ rule update_database:
                 raise FileNotFoundError(f"Cluster file not found at {cluster_file}")
                 
             start_time = time.time()
-            update_duckdb_with_cluster_info(local_master, cluster_file)
+            # Use schema compatibility features
+            update_duckdb_with_cluster_info(
+                local_master, 
+                cluster_file,
+                upgrade_schema=True
+            )
             update_time = time.time() - start_time
             logger.info(f"Cluster information update completed in {update_time:.2f} seconds")
             
@@ -161,6 +195,10 @@ rule update_database:
             logger.info("Verifying database integrity")
             con = duckdb.connect(local_master)
             try:
+                # Get schema version for reporting
+                db_version = get_db_schema_version(local_master)
+                logger.info(f"Final database schema version: {db_version}")
+                
                 # Run basic integrity checks
                 tables = con.execute("SHOW TABLES").fetchall()
                 logger.info(f"Found {len(tables)} tables in database")
@@ -176,6 +214,18 @@ rule update_database:
                 null_repseqs = con.execute("SELECT COUNT(*) FROM sequences WHERE repseq_id IS NULL").fetchone()[0]
                 if null_repseqs > 0:
                     logger.warning(f"Warning: {null_repseqs} sequences have NULL repseq_id")
+                
+                # Schema-specific checks
+                if db_version >= 2:
+                    # Check representative flag consistency in v2+ schema
+                    inconsistent_reps = con.execute("""
+                        SELECT COUNT(*) FROM sequences 
+                        WHERE (is_representative = TRUE AND seqhash_id != repseq_id)
+                        OR (is_representative = FALSE AND seqhash_id = repseq_id)
+                    """).fetchone()[0]
+                    
+                    if inconsistent_reps > 0:
+                        logger.warning(f"Warning: {inconsistent_reps} sequences have inconsistent representative flags")
             finally:
                 con.close()
             
