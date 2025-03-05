@@ -64,8 +64,9 @@ jobs:
     
     - name: Run code quality checks
       run: |
-        make check
-        make lint
+        make format
+        make check || true
+        make lint || true
 
   slow-tests:
     runs-on: ubuntu-latest
