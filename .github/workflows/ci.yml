@@ -106,4 +106,4 @@ jobs:
     
     - name: Build Docker image
       run: |
-        make image
+        docker build -t planter .
