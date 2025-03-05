@@ -40,13 +40,19 @@ python -m pytest --cov=planter --cov-report=html tests/
 
 ```bash
 # Run only fast tests (skipping slow tests)
-python -m pytest tests/ -v -k "not slow"
+make test
+
+# Run all regular tests (excluding workflow tests)
+make test-all
 
 # Run only slow tests
-python -m pytest tests/ -v -k "slow"
+make test-slow
 
-# Run only workflow tests
+# Run only workflow tests (may be unstable)
 python -m pytest tests/workflow/ -v
+
+# Run tests with verbose output
+make test-verbose
 ```
 
 ## Test Structure

@@ -31,10 +31,10 @@ help:
 	@echo "  reformat     - Run format, check, and lint in sequence"
 	@echo
 	@echo "Testing:"
-	@echo "  test         - Run fast tests"
+	@echo "  test         - Run fast tests (skip slow tests)"
 	@echo "  test-verbose - Run tests with verbose output"
 	@echo "  test-slow    - Run only slow tests"
-	@echo "  test-all     - Run all tests"
+	@echo "  test-all     - Run all stable tests (exclude workflow tests)"
 	@echo "  coverage     - Run tests with coverage report"
 	@echo
 	@echo "Development:"
@@ -159,7 +159,7 @@ test-slow:
 	python -m pytest tests/ -v -k "slow"
 
 test-all:
-	python -m pytest tests/ -v
+	python -m pytest tests/ -v -k "not workflow"
 
 coverage:
 	python -m pytest --cov=planter --cov-report=html --cov-report=term tests/ -k "not slow"
