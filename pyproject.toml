@@ -11,6 +11,10 @@ dependencies = [
     "snakemake>=7.32.4",
     "snakemake-storage-plugin-s3",
     "duckdb",
+    "pandas",
+    "numpy",
+    "biopython",
+    "pyyaml",
 ]
 
 [project.scripts]

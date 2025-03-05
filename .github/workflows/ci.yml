@@ -21,7 +21,11 @@ jobs:
     
     - name: Install dependencies
       run: |
-        make setup
+        python -m pip install --upgrade pip setuptools wheel
+        python -m pip install -e .
+        python -m pip install pytest pytest-cov black isort flake8 mypy
+        # Ensure all required packages are installed
+        python -m pip install pandas numpy biopython pyyaml
     
     - name: Run tests
       run: |
@@ -52,7 +56,11 @@ jobs:
     
     - name: Install dependencies
       run: |
-        make setup
+        python -m pip install --upgrade pip setuptools wheel
+        python -m pip install -e .
+        python -m pip install pytest pytest-cov black isort flake8 mypy
+        # Ensure all required packages are installed
+        python -m pip install pandas numpy biopython pyyaml
     
     - name: Run code quality checks
       run: |
@@ -74,7 +82,11 @@ jobs:
     
     - name: Install dependencies
       run: |
-        make setup
+        python -m pip install --upgrade pip setuptools wheel
+        python -m pip install -e .
+        python -m pip install pytest pytest-cov black isort flake8 mypy
+        # Ensure all required packages are installed
+        python -m pip install pandas numpy biopython pyyaml
     
     - name: Run slow tests
       run: |

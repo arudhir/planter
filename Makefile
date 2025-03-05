@@ -3,7 +3,7 @@
 	up image tag push bash \
 	test test-all test-verbose test-slow coverage \
 	format lint check reformat \
-	setup install-hooks \
+	setup install-hooks install-requirements \
 	dev-setup \
 	deploy \
 	clean clean-build clean-pyc \
@@ -23,24 +23,25 @@ APP_HOME ?= /usr/src/$(PROJECT_SLUG)
 
 help:
 	@echo "Available targets:"
-	@echo "  setup        - Create virtual environment and install dependencies"
-	@echo "  clean        - Remove temporary files"
-	@echo "  lint         - Run linters"
-	@echo "  format       - Format code with Black and isort"
-	@echo "  check        - Check code style without modifying files"
-	@echo "  reformat     - Run format, check, and lint in sequence"
+	@echo "  setup               - Create virtual environment and install dependencies"
+	@echo "  install-requirements - Install requirements from requirements.txt"
+	@echo "  clean               - Remove temporary files"
+	@echo "  lint                - Run linters"
+	@echo "  format              - Format code with Black and isort"
+	@echo "  check               - Check code style without modifying files"
+	@echo "  reformat            - Run format, check, and lint in sequence"
 	@echo
 	@echo "Testing:"
-	@echo "  test         - Run fast tests (skip slow tests)"
-	@echo "  test-verbose - Run tests with verbose output"
-	@echo "  test-slow    - Run only slow tests"
-	@echo "  test-all     - Run all tests"
-	@echo "  coverage     - Run tests with coverage report"
+	@echo "  test                - Run fast tests (skip slow tests)"
+	@echo "  test-verbose        - Run tests with verbose output"
+	@echo "  test-slow           - Run only slow tests"
+	@echo "  test-all            - Run all tests"
+	@echo "  coverage            - Run tests with coverage report"
 	@echo
 	@echo "Development:"
-	@echo "  install      - Install editable package"
-	@echo "  dev-setup    - Set up development environment with additional tools"
-	@echo "  install-hooks - Install git pre-commit hooks"
+	@echo "  install             - Install editable package"
+	@echo "  dev-setup           - Set up development environment with additional tools"
+	@echo "  install-hooks       - Install git pre-commit hooks"
 	@echo
 	@echo "Docker:"
 	@echo "  image        - Build the image"
@@ -124,6 +125,12 @@ setup:
 	python -m pip install --upgrade pip setuptools wheel
 	python -m pip install -e .
 	python -m pip install pytest pytest-cov black isort flake8 mypy pre-commit
+	# Ensure all required packages are explicitly installed
+	python -m pip install pandas numpy biopython pyyaml
+
+install-requirements:
+	python -m pip install --upgrade pip setuptools wheel
+	python -m pip install -r requirements.txt
 
 dev-setup: setup
 	python -m pip install ipython jupyter notebook build twine
