@@ -216,7 +216,17 @@ class TestSnakemakeWorkflow(unittest.TestCase):
             # Initialize empty database
             builder.init_database()
             
-            # Add a few sequences with different IDs
+            # Add sample metadata first (required due to foreign key constraints)
+            with builder.transaction():
+                builder.con.execute("""
+                    INSERT INTO sra_metadata (
+                        sample_id, organism, study_title
+                    ) VALUES (
+                        'MASTER', 'Master Test Organism', 'Master Test Study'
+                    );
+                """)
+            
+            # Add sequences
             with builder.transaction():
                 builder.con.execute("""
                     INSERT INTO sequences VALUES
@@ -228,14 +238,6 @@ class TestSnakemakeWorkflow(unittest.TestCase):
                     INSERT INTO gene_protein_map VALUES
                     ('MASTER_seq1', 'MASTER_seq1.p1'),
                     ('MASTER_seq2', 'MASTER_seq2.p1');
-                """)
-                
-                builder.con.execute("""
-                    INSERT INTO sra_metadata (
-                        sample_id, organism, study_title
-                    ) VALUES (
-                        'MASTER', 'Master Test Organism', 'Master Test Study'
-                    );
                 """)
         
         # Get initial sequence count in master
@@ -252,10 +254,19 @@ class TestSnakemakeWorkflow(unittest.TestCase):
         merged_db_path = self.output_dir / "merged.duckdb"
         shutil.copy(str(master_db_path), str(merged_db_path))
         
+        # Get schema file path
+        schema_sql_path = Path('/home/ubuntu/planter/planter/database/schema/migrations/001_initial_schema.sql')
+        if not schema_sql_path.exists():
+            # Create an empty schema file for testing
+            schema_sql_path = self.output_dir / "schema.sql"
+            with open(schema_sql_path, 'w') as f:
+                f.write("-- Empty schema for testing\n")
+        
         # Merge the databases
         merge_duckdbs(
             duckdb_paths=[sample_db_path],
             master_db_path=merged_db_path,
+            schema_sql_path=schema_sql_path,
             upgrade_schema=True
         )
         
@@ -291,7 +302,17 @@ class TestSnakemakeWorkflow(unittest.TestCase):
             # Initialize empty database
             builder.init_database()
             
-            # Add some sequences
+            # Add sample metadata first (required due to foreign key constraints)
+            with builder.transaction():
+                builder.con.execute("""
+                    INSERT INTO sra_metadata (
+                        sample_id, organism, study_title
+                    ) VALUES 
+                    ('MESOPLASMA', 'Mesoplasma florum', 'Test Study'),
+                    ('MASTER', 'Master Test Organism', 'Master Test Study');
+                """)
+            
+            # Add sequences
             with builder.transaction():
                 builder.con.execute("""
                     INSERT INTO sequences VALUES
@@ -484,10 +505,19 @@ class TestSnakemakeWorkflow(unittest.TestCase):
             f.write("MESOPLASMA_seq2.p1\tMESOPLASMA_seq2.p1\n")
             f.write("MESOPLASMA_seq3.p1\tMESOPLASMA_seq3.p1\n")
         
+        # Get schema file path
+        schema_sql_path = Path('/home/ubuntu/planter/planter/database/schema/migrations/001_initial_schema.sql')
+        if not schema_sql_path.exists():
+            # Create an empty schema file for testing
+            schema_sql_path = self.output_dir / "schema.sql"
+            with open(schema_sql_path, 'w') as f:
+                f.write("-- Empty schema for testing\n")
+        
         # 5. Merge databases
         merge_duckdbs(
             duckdb_paths=[sample_db_path],
             master_db_path=master_db_path,
+            schema_sql_path=schema_sql_path,
             upgrade_schema=True
         )
         
