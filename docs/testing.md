@@ -42,7 +42,7 @@ python -m pytest --cov=planter --cov-report=html tests/
 # Run only fast tests (skipping slow tests)
 make test
 
-# Run all regular tests (excluding workflow tests)
+# Run all tests 
 make test-all
 
 # Run only slow tests
