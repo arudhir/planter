@@ -6,7 +6,8 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 import botocore.exceptions
 
 from planter.database.utils.s3 import create_zip_archive, upload_to_s3
@@ -25,6 +26,7 @@ class TestS3Utils(unittest.TestCase):
     def tearDown(self):
         """Clean up after tests."""
         import shutil
+
         shutil.rmtree(self.temp_dir)
 
     def test_create_zip_archive(self):
@@ -41,14 +43,16 @@ class TestS3Utils(unittest.TestCase):
         # Mock the S3 client
         mock_s3 = MagicMock()
         mock_boto3_client.return_value = mock_s3
-        
+
         # Create a proper ClientError for 404
         error_response = {"Error": {"Code": "404", "Message": "Not Found"}}
-        mock_s3.head_object.side_effect = botocore.exceptions.ClientError(error_response, "HeadObject")
-        
+        mock_s3.head_object.side_effect = botocore.exceptions.ClientError(
+            error_response, "HeadObject"
+        )
+
         # Test the upload_to_s3 function
         result = upload_to_s3(self.temp_dir, "test_sample", "test_bucket")
-        
+
         # Verify the result
         self.assertTrue(result)
         mock_s3.upload_file.assert_called_once()
@@ -59,13 +63,13 @@ class TestS3Utils(unittest.TestCase):
         # Mock the S3 client
         mock_s3 = MagicMock()
         mock_boto3_client.return_value = mock_s3
-        
+
         # Mock the head_object method to not raise an exception (file exists)
         mock_s3.head_object.return_value = {}
-        
+
         # Test the upload_to_s3 function
         result = upload_to_s3(self.temp_dir, "test_sample", "test_bucket")
-        
+
         # Verify the result
         self.assertTrue(result)
         mock_s3.upload_file.assert_not_called()  # File should be skipped
@@ -76,17 +80,19 @@ class TestS3Utils(unittest.TestCase):
         # Mock the S3 client
         mock_s3 = MagicMock()
         mock_boto3_client.return_value = mock_s3
-        
+
         # Create a proper ClientError for 404
         error_response = {"Error": {"Code": "404", "Message": "Not Found"}}
-        mock_s3.head_object.side_effect = botocore.exceptions.ClientError(error_response, "HeadObject")
-        
+        mock_s3.head_object.side_effect = botocore.exceptions.ClientError(
+            error_response, "HeadObject"
+        )
+
         # Mock the upload_file method to raise an exception
         mock_s3.upload_file.side_effect = Exception("Upload error")
-        
+
         # Test the upload_to_s3 function
         result = upload_to_s3(self.temp_dir, "test_sample", "test_bucket")
-        
+
         # Verify the result
         self.assertFalse(result)
         mock_s3.upload_file.assert_called_once()

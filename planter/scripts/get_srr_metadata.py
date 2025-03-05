@@ -1,9 +1,11 @@
 #!/opt/venv/bin/python
-import requests
-import xml.etree.ElementTree as ET
 import argparse
-from pprint import pprint
 import time
+import xml.etree.ElementTree as ET
+from pprint import pprint
+
+import requests
+
 
 def get_sra_info(srr_id):
     """
@@ -22,10 +24,10 @@ def get_sra_info(srr_id):
         response = requests.get(esearch_url)
         response.raise_for_status()
         root = ET.fromstring(response.content)
-        id_list = root.find('IdList')
+        id_list = root.find("IdList")
         if id_list is None or len(id_list) == 0:
             return f"No record found for {srr_id}"
-        sra_id = id_list.find('Id').text
+        sra_id = id_list.find("Id").text
 
         # Step 2: Use efetch to retrieve the full record
         efetch_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=sra&id={sra_id}"
@@ -44,15 +46,19 @@ def get_sra_info(srr_id):
         # Study information
         study = root.find(".//STUDY")
         if study is not None:
-            info['study_title'] = safe_find_text(study, ".//STUDY_TITLE")
-            info['study_abstract'] = safe_find_text(study, ".//STUDY_ABSTRACT")
-            info['bioproject'] = safe_find_text(study, ".//EXTERNAL_ID[@namespace='BioProject']")
+            info["study_title"] = safe_find_text(study, ".//STUDY_TITLE")
+            info["study_abstract"] = safe_find_text(study, ".//STUDY_ABSTRACT")
+            info["bioproject"] = safe_find_text(
+                study, ".//EXTERNAL_ID[@namespace='BioProject']"
+            )
 
         # Sample information
         sample = root.find(".//SAMPLE")
         if sample is not None:
-            info['organism'] = safe_find_text(sample, ".//SCIENTIFIC_NAME")
-            info['biosample'] = safe_find_text(sample, ".//EXTERNAL_ID[@namespace='BioSample']")
+            info["organism"] = safe_find_text(sample, ".//SCIENTIFIC_NAME")
+            info["biosample"] = safe_find_text(
+                sample, ".//EXTERNAL_ID[@namespace='BioSample']"
+            )
 
         # Experiment information
         experiment = root.find(".//EXPERIMENT")
@@ -60,30 +66,38 @@ def get_sra_info(srr_id):
             library = experiment.find(".//LIBRARY_DESCRIPTOR")
             if library is not None:
                 layout = library.find("LIBRARY_LAYOUT")
-                layout_type = next(iter(layout)) if layout is not None and len(layout) > 0 else None
-                info['library'] = {
-                    'name': safe_find_text(library, "LIBRARY_NAME"),
-                    'strategy': safe_find_text(library, "LIBRARY_STRATEGY"),
-                    'source': safe_find_text(library, "LIBRARY_SOURCE"),
-                    'selection': safe_find_text(library, "LIBRARY_SELECTION"),
-                    'layout': layout_type.tag if layout_type is not None else "Not found"
+                layout_type = (
+                    next(iter(layout))
+                    if layout is not None and len(layout) > 0
+                    else None
+                )
+                info["library"] = {
+                    "name": safe_find_text(library, "LIBRARY_NAME"),
+                    "strategy": safe_find_text(library, "LIBRARY_STRATEGY"),
+                    "source": safe_find_text(library, "LIBRARY_SOURCE"),
+                    "selection": safe_find_text(library, "LIBRARY_SELECTION"),
+                    "layout": (
+                        layout_type.tag if layout_type is not None else "Not found"
+                    ),
                 }
 
             platform = experiment.find(".//PLATFORM")
             if platform is not None:
                 # The instrument is the first child of the PLATFORM element
                 instrument = next(iter(platform), None)
-                info['instrument'] = instrument.tag if instrument is not None else "Not found"
+                info["instrument"] = (
+                    instrument.tag if instrument is not None else "Not found"
+                )
 
         # Run information
         run = root.find(".//RUN")
         if run is not None:
-            info['run'] = {
-                'accession': run.get('accession'),
-                'spots': run.get('total_spots'),
-                'bases': run.get('total_bases'),
-                'size': run.get('size'),
-                'published': run.get('published')
+            info["run"] = {
+                "accession": run.get("accession"),
+                "spots": run.get("total_spots"),
+                "bases": run.get("total_bases"),
+                "size": run.get("size"),
+                "published": run.get("published"),
             }
 
         return info
@@ -95,12 +109,17 @@ def get_sra_info(srr_id):
     except Exception as e:
         return f"Unexpected error occurred for {srr_id}: {str(e)}"
 
+
 def main():
     """
     Main function to parse command-line arguments and display SRA information for one or multiple SRR IDs.
     """
-    parser = argparse.ArgumentParser(description="Retrieve comprehensive SRA information for one or multiple SRR IDs")
-    parser.add_argument("--srr", nargs='+', required=True, help="One or more SRR IDs to look up")
+    parser = argparse.ArgumentParser(
+        description="Retrieve comprehensive SRA information for one or multiple SRR IDs"
+    )
+    parser.add_argument(
+        "--srr", nargs="+", required=True, help="One or more SRR IDs to look up"
+    )
     args = parser.parse_args()
 
     for srr_id in args.srr:
@@ -118,6 +137,7 @@ def main():
 
         # Add a delay between processing each SRR ID
         time.sleep(1)
+
 
 if __name__ == "__main__":
     main()

@@ -7,20 +7,34 @@ import subprocess
 import sys
 from pathlib import Path
 
+
 def parse_arguments():
-    parser = argparse.ArgumentParser(description='Batch update script for MMseqs clustering')
-    parser.add_argument('-g', '--glob-pattern', required=True,
-                        help='Glob pattern for input files (e.g., "*.pep")')
-    parser.add_argument('-o', '--output-dir', required=True,
-                        help='Base output directory')
-    parser.add_argument('-i', '--initial-reps', default='',
-                        help='Initial old representative sequences file')
+    parser = argparse.ArgumentParser(
+        description="Batch update script for MMseqs clustering"
+    )
+    parser.add_argument(
+        "-g",
+        "--glob-pattern",
+        required=True,
+        help='Glob pattern for input files (e.g., "*.pep")',
+    )
+    parser.add_argument(
+        "-o", "--output-dir", required=True, help="Base output directory"
+    )
+    parser.add_argument(
+        "-i",
+        "--initial-reps",
+        default="",
+        help="Initial old representative sequences file",
+    )
     return parser.parse_args()
+
 
 def setup_output_directory(base_dir):
     """Create the base output directory if it doesn't exist."""
     os.makedirs(base_dir, exist_ok=True)
     return base_dir
+
 
 def get_sorted_files(glob_pattern):
     """Get and sort the list of files matching the glob pattern."""
@@ -29,6 +43,7 @@ def get_sorted_files(glob_pattern):
         print(f"No files found matching the pattern {glob_pattern}")
         sys.exit(1)
     return sorted(files)
+
 
 def run_mmseqs_update(script_path, old_reps, new_file, output_dir):
     """Run the mmseqs_cluster_update.py script with the given parameters."""
@@ -44,15 +59,23 @@ def run_mmseqs_update(script_path, old_reps, new_file, output_dir):
     mmseqs_script = os.path.join(current_dir, "mmseqs_cluster_update.py")
 
     try:
-        subprocess.run([
-            sys.executable, mmseqs_script,
-            "--old", old_reps,
-            "--new", new_file,
-            "--output", output_dir
-        ], check=True)
+        subprocess.run(
+            [
+                sys.executable,
+                mmseqs_script,
+                "--old",
+                old_reps,
+                "--new",
+                new_file,
+                "--output",
+                output_dir,
+            ],
+            check=True,
+        )
     except subprocess.CalledProcessError as e:
         print(f"Error running mmseqs_cluster_update.py: {e}")
         sys.exit(1)
+
 
 def main():
     args = parse_arguments()
@@ -63,7 +86,9 @@ def main():
     old_rep_seqs = args.initial_reps
     if not old_rep_seqs:
         old_rep_seqs = files[0]
-        print(f"No initial representative sequences provided. Using {files[0]} as initial --old input.")
+        print(
+            f"No initial representative sequences provided. Using {files[0]} as initial --old input."
+        )
         files = files[1:]  # Skip the first file if we're using it as initial input
 
     # Process each file
@@ -75,11 +100,12 @@ def main():
             script_path="mmseqs_cluster_update.py",
             old_reps=old_rep_seqs,
             new_file=file,
-            output_dir=output_dir
+            output_dir=output_dir,
         )
 
         # Update old_rep_seqs for the next iteration
         old_rep_seqs = os.path.join(output_dir, "newRepSeqDB.fasta")
+
 
 if __name__ == "__main__":
     main()

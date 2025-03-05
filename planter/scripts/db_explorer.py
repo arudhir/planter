@@ -1,18 +1,37 @@
-import streamlit as st
 import duckdb
 import pandas as pd
+import streamlit as st
 
 # connect to the database
-db_path = '/mnt/data2/planter_outputs/planter.duckdb'
+db_path = "/mnt/data2/planter_outputs/planter.duckdb"
 con = duckdb.connect(db_path)
 
 st.title("Explore Your Sequences Database")
 
 # fetch unique values for dropdowns
-sample_ids = con.execute("SELECT DISTINCT sample_id FROM sequences").fetchdf()["sample_id"].tolist()
-go_terms = con.execute("SELECT DISTINCT go_term FROM go_terms").fetchdf()["go_term"].dropna().tolist()
-ec_numbers = con.execute("SELECT DISTINCT ec_number FROM ec_numbers").fetchdf()["ec_number"].dropna().tolist()
-cog_categories = con.execute("SELECT DISTINCT cog_category FROM annotations").fetchdf()["cog_category"].dropna().tolist()
+sample_ids = (
+    con.execute("SELECT DISTINCT sample_id FROM sequences")
+    .fetchdf()["sample_id"]
+    .tolist()
+)
+go_terms = (
+    con.execute("SELECT DISTINCT go_term FROM go_terms")
+    .fetchdf()["go_term"]
+    .dropna()
+    .tolist()
+)
+ec_numbers = (
+    con.execute("SELECT DISTINCT ec_number FROM ec_numbers")
+    .fetchdf()["ec_number"]
+    .dropna()
+    .tolist()
+)
+cog_categories = (
+    con.execute("SELECT DISTINCT cog_category FROM annotations")
+    .fetchdf()["cog_category"]
+    .dropna()
+    .tolist()
+)
 
 # filter selection components
 selected_sample_id = st.selectbox("Sample ID", options=["All"] + sample_ids)

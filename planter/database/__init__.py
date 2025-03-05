@@ -1,6 +1,9 @@
-from .schema.schema import SchemaManager
 import logging
+
 import duckdb
+
+from .schema.schema import SchemaManager
+
 
 class SequenceDBBuilder:
     def __init__(self, db_path: str):
