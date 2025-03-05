@@ -1,64 +1,16 @@
 import os
-from pathlib import Path
-import shutil
-import hashlib
-import boto3
-import botocore
 import logging
-import ipdb
-import urllib3
+from pathlib import Path
 import duckdb
 from typing import List, Union
-import pandas as pd 
+import pandas as pd
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-boto3.set_stream_logger(name='botocore', level=logging.INFO)
+from planter.database.utils.s3 import create_zip_archive, upload_to_s3
+from planter.database.utils.duckdb_utils import merge_duckdbs, update_duckdb_with_cluster_info
+from planter.database.schema.schema_version import get_db_schema_version, ensure_compatibility
 
-def create_zip_archive(output_dir):
-    zip_archive = shutil.make_archive(
-        base_name=f'{output_dir}', 
-        root_dir=output_dir,
-        format='zip'
-    )
-    return zip_archive
-
-
-def upload_to_s3(output_dir, sample, bucket):
-    """
-    Upload all files from output_dir to `bucket` under an S3 prefix = sample.
-    If a file already exists in S3, skip it (do not fail).
-    Return True if all files were either skipped or uploaded successfully;
-    return False if an unrecoverable error occurs.
-    """
-    s3 = boto3.client('s3')
-    output_path = Path(output_dir)
-    success = True  # We will set this to False only if we hit an actual error.
-    
-    for root, dirs, files in os.walk(output_dir):
-        for filename in files:
-            local_path = Path(root) / filename
-            s3_key = str(Path(sample) / local_path.relative_to(output_path))
-            
-            try:
-                # Check if the object already exists:
-                s3.head_object(Bucket=bucket, Key=s3_key)
-                # If no exception, the object exists => skip upload
-                print(f"Skipping {local_path}: {s3_key} already exists in {bucket}.")
-            except botocore.exceptions.ClientError as e:
-                # If it's a 404 error => S3 object not found => proceed to upload
-                if e.response['Error']['Code'] == "404":
-                    print(f"Uploading {local_path} to s3://{bucket}/{s3_key}")
-                    try:
-                        s3.upload_file(str(local_path), bucket, s3_key)
-                    except Exception as upload_error:
-                        print(f"Error uploading {local_path} to {s3_key}: {upload_error}")
-                        success = False
-                else:
-                    # Some other error (e.g., permissions) => fail this run
-                    print(f"Error checking S3 object {s3_key}: {e}")
-                    success = False
-    
-    return success
+# Setup module logger
+logger = logging.getLogger(__name__)
 
 
 rule get_qc_stats:
@@ -83,271 +35,11 @@ rule get_qc_stats:
             '--output_file {output.qc_stats}'
         )
 
-# We need to wait until all of the proteins are done being made, then concatenate them and update the repseq.
-# This is a bit of a pain because we need to wait until all of the samples are done.
-# We can do this by adding a rule that waits for all of the samples to be done, then concatenates the proteins and updates the repseq.
-# rule concatenate_peptides:
-#     input:
-#         peptides = expand(rules.transdecoder.output.longest_orfs_pep, sample=config['samples']),
-#     output:
-#         all_peptides = Path(config['outdir']) / 'all_peptides.fasta',
-#     run:
-#         shell('cat {input.peptides} > {output.all_peptides}')
-
 storage:
     provider = "s3",
 
-def merge_duckdbs(
-    duckdb_paths: List[Union[str, Path]],
-    master_db_path: Union[str, Path],
-    schema_sql_path: Union[str, Path]
-) -> None:
-    """
-    Merge multiple DuckDB databases into a master DuckDB.
-    
-    Parameters:
-      duckdb_paths (List[Union[str, Path]]): List of paths to source DuckDB files.
-      master_db_path (Union[str, Path]): Path to the master (merged) DuckDB.
-      schema_sql_path (Union[str, Path]): Path to the SQL file defining the schema.
-    
-    The function:
-      - Creates (or opens) the master database.
-      - Executes the schema SQL to create tables if they don't exist.
-      - Iterates through each source database, attaches it,
-        and inserts data into the master tables in dependency order.
-      - Uses INSERT OR IGNORE to avoid duplicate key errors.
-      - Detaches each source database after merging.
-    """
-    
-    master_db_path = str(master_db_path)
-    schema_sql_path = Path(schema_sql_path)
-    
-    # Read the schema SQL
-    schema_sql = schema_sql_path.read_text()
-    
-    with duckdb.connect(master_db_path) as master_conn:
-        # Set up the schema in the master database
-        master_conn.execute(schema_sql)
-        
-        # Process each source DuckDB
-        for i, source_db in enumerate(duckdb_paths):
-            alias = f"db{i}"
-            source_db_str = str(source_db)
-            print(f"Attaching {source_db_str} as {alias}...")
-            master_conn.execute(f"ATTACH '{source_db_str}' AS {alias};")
-            
-            # Insert data in dependency order
-            master_conn.execute(f"""
-                INSERT OR IGNORE INTO sra_metadata
-                SELECT * FROM {alias}.sra_metadata;
-            """)
-            master_conn.execute(f"""
-                INSERT OR IGNORE INTO sequences
-                SELECT * FROM {alias}.sequences;
-            """)
-            master_conn.execute(f"""
-                INSERT OR IGNORE INTO annotations
-                SELECT * FROM {alias}.annotations;
-            """)
-            master_conn.execute(f"""
-                INSERT OR IGNORE INTO go_terms
-                SELECT * FROM {alias}.go_terms;
-            """)
-            master_conn.execute(f"""
-                INSERT OR IGNORE INTO ec_numbers
-                SELECT * FROM {alias}.ec_numbers;
-            """)
-            master_conn.execute(f"""
-                INSERT OR IGNORE INTO kegg_info
-                SELECT * FROM {alias}.kegg_info;
-            """)
-            master_conn.execute(f"""
-                INSERT OR IGNORE INTO clusters
-                SELECT * FROM {alias}.clusters;
-            """)
-            master_conn.execute(f"""
-                INSERT OR IGNORE INTO cluster_members
-                SELECT * FROM {alias}.cluster_members;
-            """)
-            
-            # Optionally, merge schema_version if needed:
-            # master_conn.execute(f"""
-            #     INSERT OR IGNORE INTO schema_version
-            #     SELECT * FROM {alias}.schema_version;
-            # """)
-            
-            master_conn.execute(f"DETACH {alias};")
-            print(f"Finished merging {source_db_str}\n")
-        
-        # Optional commit; DuckDB auto-commits by default.
-        master_conn.commit()
-    
-    print("All databases have been merged into:", master_db_path)
-    return master_db_path
-
-def update_duckdb_with_cluster_info(db_path: str, tsv_path: str):
-    """
-    Updates a DuckDB database with clustering information from an MMSeqs2 TSV file.
-
-    Parameters:
-    - db_path (str): Path to the DuckDB database file.
-    - tsv_path (str): Path to the MMSeqs2 TSV file containing clustering data.
-    """
-    
-    # Load the MMSeqs2 TSV into a DataFrame
-    df = pd.read_csv(tsv_path, sep="\t", names=["representative_seqhash_id", "seqhash_id"])
-    df = df.drop_duplicates()
-    # Connect to DuckDB
-    con = duckdb.connect(db_path)
-
-    # Create a temporary table for the MMSeqs2 data
-    con.execute("""
-        CREATE TEMPORARY TABLE mmseqs2_clusters (
-            representative_seqhash_id VARCHAR,
-            seqhash_id VARCHAR
-        )
-    """)
-
-    # Insert data into the temporary table
-    con.executemany("INSERT INTO mmseqs2_clusters VALUES (?, ?)", df.values.tolist())
-
-    # Update the sequences table to assign the representative sequence
-    con.execute("""
-        UPDATE sequences 
-        SET repseq_id = mm.representative_seqhash_id
-        FROM mmseqs2_clusters mm
-        WHERE sequences.seqhash_id = mm.seqhash_id
-    """)
-
-    # Insert new clusters into the clusters table if they don't exist
-    con.execute("""
-        INSERT INTO clusters (cluster_id, representative_seqhash_id, size)
-        SELECT representative_seqhash_id, representative_seqhash_id, COUNT(*)
-        FROM mmseqs2_clusters
-        GROUP BY representative_seqhash_id
-        ON CONFLICT (cluster_id) DO NOTHING
-    """)
-
-    # Insert cluster memberships into the cluster_members table
-    con.execute("""
-        INSERT INTO cluster_members (seqhash_id, cluster_id)
-        SELECT seqhash_id, representative_seqhash_id FROM mmseqs2_clusters
-        ON CONFLICT (seqhash_id) DO NOTHING
-    """)
-
-    # Close the connection
-    con.close()
-
-    print(f"Database '{db_path}' successfully updated with MMSeqs2 clustering information.")
-
-# def update_duckdb_with_cluster_info(master_db_path: str, tsv_path: str, inplace=False):
-#     """
-#     Update the 'sequences' table in the master DuckDB using a cluster mapping TSV.
-    
-#     Parameters:
-#         master_db_path (str): Path to the master DuckDB file.
-#         tsv_path (str): Path to the TSV file containing cluster mappings.
-#                         The TSV should have two columns (no header):
-#                           - Column 0: repseq_id (the representative seqhash)
-#                           - Column 1: seqhash_id (the member seqhash)
-                          
-#     The function updates the 'repseq_id' column in the 'sequences' table such that
-#     for every row where sequences.seqhash_id matches the TSV's member, repseq_id is set
-#     to the TSV's repseq_id. It also sets is_representative to TRUE for sequences that are representatives.
-#     """
-#     print(f"Updating master DB with cluster info from {tsv_path}")
-#     # Connect to the master DuckDB.
-#     con = duckdb.connect(master_db_path)
-    
-#     # Create a temporary table by reading the TSV file.
-#     # We assume the TSV has no header and uses tab as the separator.
-#     con.execute(f"""
-#     CREATE TEMPORARY TABLE new_clusters AS 
-#       SELECT * FROM read_csv_auto('{tsv_path}', header=False, sep='\t', names=['repseq_id', 'seqhash_id'])
-#       AS (repseq_id VARCHAR, seqhash_id VARCHAR);
-#     """)
-    
-#     # # Optionally, update the is_representative flag.
-#     # # For every sequence that appears as a repseq_id in the new_clusters table, mark it as representative.
-#     con.execute("""
-#     UPDATE sequences
-#     SET is_representative = TRUE
-#     WHERE seqhash_id IN (
-#         SELECT DISTINCT repseq_id FROM new_clusters
-#     );
-#     """)
-    
-#     con.close()
-#     print("Master DB updated using cluster mapping.")
 
 
-
-# rule batch_cluster_update:
-#     """
-#     Batch cluster update:
-    
-#     Concatenate all samples' peptide files, run mmseqs_cluster_update.py
-#     to update the canonical repseq FASTA, upload it to S3, and create a
-#     single done flag.
-#     """
-#     input:
-#         # The current canonical repseq downloaded from S3.
-#         old_repseq = storage.s3("s3://recombia.planter/repseq.faa"),
-#         # Peptide files for all samples in the batch.
-#         pep = expand("{outdir}/{sample}/transdecoder/{sample}.pep",
-#                      outdir=config["outdir"],
-#                      sample=config["samples"])
-#     output:
-#         # Final updated repseq file.
-#         final_repseq = Path(config["outdir"]) / "cluster" / "repseq.faa",
-#         # The new cluster TSV file (if your script produces it)
-#         cluster_tsv  = Path(config["outdir"]) / "cluster" / "newClusterDB.tsv",
-#         # A single done flag file.
-#         done = Path(config["outdir"]) / "cluster" / "repseq_update_done.txt"
-#     params:
-#         # Use a dedicated temporary subdirectory inside the cluster folder.
-#         cluster_dir = Path(config["outdir"]) / "cluster",
-#         tmp_dir = Path(config["outdir"]) / "cluster" / "tmp",
-#         # The canonical repseq S3 URI.
-#         repseq_s3 = "s3://recombia.planter/repseq.faa"
-#     threads: workflow.cores
-#     run:
-#         shell(
-#             r"""
-#             set -e  # Exit immediately if any command fails.
-            
-#             # Ensure the cluster output directory and temporary subdirectory exist.
-#             mkdir -p {params.cluster_dir}
-#             rm -rf {params.tmp_dir}
-#             mkdir -p {params.tmp_dir}
-            
-#             # Concatenate all peptide files into a temporary aggregated file.
-#             cat {input.pep} > {params.tmp_dir}/all_new.pep
-            
-#             # Run the mmseqs cluster update script.
-#             # This script reads the current repseq (-i {input.old_repseq}),
-#             # uses the aggregated peptides from {params.tmp_dir}/all_new.pep,
-#             # and writes its updated repseq to {params.tmp_dir}/newRepSeqDB.fasta.
-#             python ./planter/scripts/mmseqs_cluster_update.py -i {input.old_repseq} -o {params.tmp_dir} {params.tmp_dir}/all_new.pep
-            
-#             # Copy the updated repseq produced by mmseqs_cluster_update.py to the final output location.
-#             cp {params.tmp_dir}/newRepSeqDB.fasta {output.final_repseq}
-            
-#             # Optionally, copy the cluster TSV file if your script produces it.
-#             if [ -f {params.tmp_dir}/newClusterDB.tsv ]; then
-#                 cp {params.tmp_dir}/newClusterDB.tsv {output.cluster_tsv}
-#             fi
-            
-#             # Upload the final repseq to S3.
-#             aws s3 cp {output.final_repseq} {params.repseq_s3}
-            
-#             # Clean up the temporary directory.
-#             rm -rf {params.tmp_dir}
-            
-#             # Touch the done flag.
-#             touch {output.done}
-#             """
-#         )
 
 rule create_duckdb:
     input:
@@ -368,58 +60,186 @@ rule create_duckdb:
 rule update_database:
     input:
         master_db = storage.s3("s3://recombia.planter/master-database.duckdb"),
-        proteins = expand(rules.transdecoder.output.longest_orfs_pep, sample=config['samples']),  # Redundant I suppose
+        proteins = expand(rules.transdecoder.output.longest_orfs_pep, sample=config['samples']),
         duckdb = expand(rules.create_duckdb.output, sample=config['samples']),
     output:
         updated_master = Path(config['outdir']) / 'updated_master.duckdb',
         concat_proteins = temp(Path(config['outdir']) / 'concat_proteins.pep'),
-        # newClusterDB = temp(Path(config['outdir']) / 'newClusterDB.tsv'),
         done = temp(Path(config['outdir']) / 'update_database_done.txt')
     params:
         canonical_db = "s3://recombia.planter/master.duckdb",
-        tmp_dir = Path(config["outdir"]) / "tmp"
+        tmp_dir = Path(config["outdir"]) / "tmp",
+        schema_path = Path('/usr/src/planter/planter/database/schema/migrations/001_initial_schema.sql'),
+        # Target schema version (set to None to use latest available)
+        target_schema_version = None
+    log:
+        Path(config['outdir']) / 'logs' / 'update_database.log'
     run:
-        # import ipdb; ipdb.set_trace()
-        shell(
-                """
-                rm -rf {params.tmp_dir}
-                mkdir -p {params.tmp_dir}
-                # Concatenate all of the proteins into a single file.
-                cat {input.proteins} > {output.concat_proteins}
-
-                # Extract repseq.faa from master.duckdb
-                duckdb {input.master_db} -noheader -list -c "
+        import logging
+        import time
+        import shutil
+        from datetime import datetime
+        
+        # Set up logging to both file and console
+        log_file = str(log.path)
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler(log_file),
+                logging.StreamHandler()
+            ]
+        )
+        logger = logging.getLogger('update_database')
+        
+        logger.info(f"Starting database update at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info(f"Processing samples: {config['samples']}")
+        
+        try:
+            # Create a local copy of the master database for processing
+            local_master = str(output.updated_master)
+            logger.info(f"Creating local copy of master database at {local_master}")
+            shutil.copy(str(input.master_db), local_master)
+            
+            # Check and ensure schema compatibility
+            schema_version, was_upgraded = ensure_compatibility(
+                local_master,
+                required_version=params.target_schema_version
+            )
+            if was_upgraded:
+                logger.info(f"Database schema was automatically upgraded to version {schema_version}")
+            else:
+                logger.info(f"Database schema version: {schema_version} (no upgrade needed)")
+            
+            # 1. Setup temp directory
+            logger.info(f"Setting up temporary directory at {params.tmp_dir}")
+            if os.path.exists(params.tmp_dir):
+                shutil.rmtree(params.tmp_dir)
+            os.makedirs(params.tmp_dir, exist_ok=True)
+            
+            # 2. Concatenate all proteins
+            logger.info("Concatenating protein sequences")
+            with open(output.concat_proteins, 'wb') as concat_file:
+                for protein_file in input.proteins:
+                    with open(protein_file, 'rb') as pf:
+                        shutil.copyfileobj(pf, concat_file)
+            
+            # 3. Extract representative sequences from master DB
+            logger.info("Extracting representative sequences from master database")
+            repseq_path = params.tmp_dir / "repseq.faa"
+            shell(
+                f"""
+                duckdb {local_master} -noheader -list -c "
                     SELECT 
                         '>' || seqhash_id || chr(10) || sequence
                     FROM 
                         sequences
                     WHERE 
                         repseq_id = seqhash_id;
-                    " > {params.tmp_dir}/repseq.faa
+                " > {repseq_path}
                 """
-        )
-        shell("""
-            # Run mmseqs_cluster_update.py
-            python ./planter/scripts/mmseqs_cluster_update.py -i {params.tmp_dir}/repseq.faa -o {params.tmp_dir} {output.concat_proteins}
-            """
-        )
-        # Merge duckdbs
-        master_db_path = merge_duckdbs(
-            duckdb_paths=input.duckdb,
-            master_db_path=input.master_db,
-            schema_sql_path=Path('/usr/src/planter/planter/database/schema/migrations/001_initial_schema.sql')  # TODO: Move to config
-        )
-        # Update the concat_master.duckdb with the newClusterDB.tsv info
-        update_duckdb_with_cluster_info(input.master_db, params.tmp_dir / "newClusterDB.tsv")
-        print('Done updating master DB with cluster info.')
-
-        # Copy the newly updated master DB to the output file
-        shell("cp {input.master_db} {output.updated_master}")
-        # Upload the updated master DB to S3
-        shell(f"aws s3 cp {output.updated_master} {params.canonical_db}")
-        
-        # Touch the done flag.
-        shell("touch {output.done}")
+            )
+            
+            # 4. Run MMSeqs2 clustering update
+            logger.info("Running MMSeqs2 clustering update")
+            start_time = time.time()
+            shell(
+                f"""
+                python ./planter/scripts/mmseqs_cluster_update.py -i {repseq_path} -o {params.tmp_dir} {output.concat_proteins}
+                """
+            )
+            clustering_time = time.time() - start_time
+            logger.info(f"MMSeqs2 clustering completed in {clustering_time:.2f} seconds")
+            
+            # 5. Merge sample DuckDBs into master DB with schema compatibility
+            logger.info("Merging sample databases into master database")
+            start_time = time.time()
+            
+            # Check schema versions of sample databases
+            sample_schema_versions = {}
+            for sample_db in input.duckdb:
+                sample_version = get_db_schema_version(sample_db)
+                sample_schema_versions[str(sample_db)] = sample_version
+                
+            logger.info(f"Sample database schema versions: {sample_schema_versions}")
+            
+            # Merge databases with schema compatibility
+            master_db_path = merge_duckdbs(
+                duckdb_paths=input.duckdb,
+                master_db_path=local_master,
+                schema_sql_path=params.schema_path,
+                upgrade_schema=True,
+                target_schema_version=params.target_schema_version
+            )
+            merge_time = time.time() - start_time
+            logger.info(f"Database merge completed in {merge_time:.2f} seconds")
+            
+            # 6. Update the master DB with new cluster information
+            logger.info("Updating master database with new cluster information")
+            cluster_file = params.tmp_dir / "newClusterDB.tsv"
+            if not os.path.exists(cluster_file):
+                raise FileNotFoundError(f"Cluster file not found at {cluster_file}")
+                
+            start_time = time.time()
+            # Use schema compatibility features
+            update_duckdb_with_cluster_info(
+                local_master, 
+                cluster_file,
+                upgrade_schema=True
+            )
+            update_time = time.time() - start_time
+            logger.info(f"Cluster information update completed in {update_time:.2f} seconds")
+            
+            # 7. Verify database integrity
+            logger.info("Verifying database integrity")
+            con = duckdb.connect(local_master)
+            try:
+                # Get schema version for reporting
+                db_version = get_db_schema_version(local_master)
+                logger.info(f"Final database schema version: {db_version}")
+                
+                # Run basic integrity checks
+                tables = con.execute("SHOW TABLES").fetchall()
+                logger.info(f"Found {len(tables)} tables in database")
+                
+                # Check for basic stats
+                sequence_count = con.execute("SELECT COUNT(*) FROM sequences").fetchone()[0]
+                cluster_count = con.execute("SELECT COUNT(*) FROM clusters").fetchone()[0]
+                sample_count = con.execute("SELECT COUNT(DISTINCT sample_id) FROM sra_metadata").fetchone()[0]
+                
+                logger.info(f"Database summary: {sequence_count} sequences, {cluster_count} clusters, {sample_count} samples")
+                
+                # Verify that all sequences have a repseq_id
+                null_repseqs = con.execute("SELECT COUNT(*) FROM sequences WHERE repseq_id IS NULL").fetchone()[0]
+                if null_repseqs > 0:
+                    logger.warning(f"Warning: {null_repseqs} sequences have NULL repseq_id")
+                
+                # Schema-specific checks
+                if db_version >= 2:
+                    # Check representative flag consistency in v2+ schema
+                    inconsistent_reps = con.execute("""
+                        SELECT COUNT(*) FROM sequences 
+                        WHERE (is_representative = TRUE AND seqhash_id != repseq_id)
+                        OR (is_representative = FALSE AND seqhash_id = repseq_id)
+                    """).fetchone()[0]
+                    
+                    if inconsistent_reps > 0:
+                        logger.warning(f"Warning: {inconsistent_reps} sequences have inconsistent representative flags")
+            finally:
+                con.close()
+            
+            # 8. Upload to S3
+            logger.info(f"Uploading updated database to S3 at {params.canonical_db}")
+            shell(f"aws s3 cp {local_master} {params.canonical_db}")
+            
+            # 9. Mark as done
+            logger.info("Database update completed successfully")
+            shell(f"touch {output.done}")
+            
+        except Exception as e:
+            logger.error(f"Error updating database: {str(e)}", exc_info=True)
+            raise
 
 rule upload_to_s3:
     input:

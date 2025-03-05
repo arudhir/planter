@@ -267,6 +267,137 @@ Flask app in `app/`, `python app/main.py`
 ![simplified-vision](images/simplified-vision.png "simplified-vision")
 ![schema](images/schema.png "schema")
 
+# Tests
+
+The project includes comprehensive test suites for various components:
+
+## Database Tests
+
+### Core Database Builder (`tests/database/test_database_builder.py`)
+
+Tests for the `SequenceDBBuilder` class which handles database construction from raw sequence data:
+
+- **Database Initialization Tests**:
+  - Verifies proper creation of all required tables (sequences, annotations, go_terms, etc.)
+  - Tests correct loading of sequence data, annotation data, GO terms, EC numbers
+  - Validates expression data loading and linking
+  - Verifies gene-protein mapping relationships
+
+- **Database Summary Tests**:
+  - Tests the database summary functionality that reports statistics
+  - Validates counts of total sequences, samples, annotations, and various annotation types
+
+### Expression Queries (`tests/database/test_expression_queries.py`) 
+
+Tests for the `QueryManager` class, specifically focusing on expression data queries:
+
+- **Expression Summary Tests**:
+  - Tests summarizing expression data across samples
+  - Validates expression level categorization (low, medium, high, very high)
+  - Tests retrieval of top-expressed sequences with proper ordering
+
+- **Expression Data Retrieval Tests**:
+  - Tests fetching expression data for specific gene/protein sequences
+  - Validates linking between annotation and expression data
+  - Tests expression level statistics and distribution analysis
+
+- **Sequence Search Tests**:
+  - Tests searching sequences by various criteria (description, length, sample)
+  - Validates handling of non-existent data in search functions
+
+### Schema Migrations (`tests/database/test_schema_migrations.py`)
+
+Tests for the `SchemaManager` class which handles database schema migrations:
+
+- **Migration Application Tests**:
+  - Verifies migrations are applied in the correct sequence
+  - Tests that all required tables are created by migrations
+  - Validates the structure of tables created by migrations
+
+- **Schema Validation Tests**:
+  - Tests schema of expression table (columns, types)
+  - Verifies foreign key constraints between tables
+  - Validates data integrity across the database
+
+### Sequence Search (`tests/database/test_sequence_search.py`)
+
+Tests for the web interface's sequence search functionality:
+
+- **API Endpoint Tests**:
+  - Tests the `load_example` endpoint for loading example sequences
+  - Verifies proper error handling when files are not found
+
+### Database Utility Tests (`tests/database/utils/`)
+
+#### DuckDB Utilities (`test_duckdb_utils.py`)
+
+Tests for database operations in the utilities module:
+
+- **Database Merging Tests**:
+  - Tests merging of multiple DuckDB databases
+  - Verifies all tables and data are correctly combined
+  - Validates data integrity after merging
+
+- **Cluster Update Tests**:
+  - Tests updating sequence cluster information from MMSeqs2 TSV output
+  - Verifies correct representative sequence assignment
+  - Validates cluster member relationships
+
+- **Integration Tests**:
+  - Tests with real sample data from fixtures
+  - End-to-end MMSeqs2 clustering integration
+  - Tests full workflow from clustering to database update
+
+#### S3 Utilities (`test_s3_utils.py`)
+
+Tests for S3 interaction functionality:
+
+- **Archive Creation Tests**:
+  - Tests creating zip archives of output directories
+
+- **S3 Upload Tests**:
+  - Tests successful upload to S3
+  - Verifies handling of files that already exist in S3
+  - Tests error handling during uploads
+
+## Pipeline Tests
+
+### DuckDB Creation Pipeline (`tests/pipeline/test_duckdb_creation.py`)
+
+Tests for the database creation pipeline:
+
+- **Database Creation Tests**:
+  - Tests the end-to-end process of creating a DuckDB database
+  - Verifies all required tables and data are loaded correctly
+  - Tests integration with fixture data from real samples
+
+- **Expression Data Pipeline Tests**:
+  - Tests loading expression data from JSON files into the database
+  - Validates queries for expression statistics
+  - Tests distribution analysis and top expressed sequence retrieval
+
+## Running Tests
+
+Run all tests with:
+```bash
+python -m pytest tests/
+```
+
+Run specific test files:
+```bash
+python -m pytest tests/database/test_database_builder.py
+```
+
+Run a specific test:
+```bash
+python -m pytest tests/database/test_database_builder.py::TestSequenceDBBuilder::test_database_initialization
+```
+
+Run tests with increased verbosity:
+```bash
+python -m pytest tests/ -v
+```
+
 # TODO
 
 - [ x ] Write script that finalizes the output metadata
