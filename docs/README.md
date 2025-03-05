@@ -5,6 +5,7 @@ Welcome to the Planter project documentation. This documentation provides detail
 ## Documentation Index
 
 - [Testing Guide](testing.md): How to run and write tests for the project
+- [CI/CD Guide](ci_cd.md): Continuous Integration and Deployment workflows
 - [Database Update Process](database_update_process.md): Overview of how databases are merged and updated
 - [Schema Versioning Guide](schema_versioning.md): Guide to the schema versioning system and update process
 
