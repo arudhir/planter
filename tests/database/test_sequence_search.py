@@ -16,7 +16,7 @@ from flask import Flask
 
 from planter.database.query_manager import QueryManager
 # Import local mock app instead of the actual app package
-from .app_mock import create_app
+from tests.database.app_mock import create_app
 
 class TestSequenceSearch(unittest.TestCase):
     """Test cases for sequence search functionality."""
