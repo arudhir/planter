@@ -35,8 +35,15 @@ rule get_qc_stats:
             '--output_file {output.qc_stats}'
         )
 
-# Define S3 storage configuration
-storage: s3
+# Define S3 storage configuration - required directive for S3 access in Snakemake 7.x
+use_s3 = True
+configfile: "planter/workflow/config.yaml"
+
+# Attach the S3 remote provider for remote file access
+from snakemake.remote.S3 import RemoteProvider as S3RemoteProvider
+S3 = S3RemoteProvider()
+
+# Clear any accidental extra blank lines to ensure clean syntax
 
 rule create_duckdb:
     input:
@@ -56,7 +63,7 @@ rule create_duckdb:
 
 rule update_database:
     input:
-        master_db = storage.s3("s3://recombia.planter/master-database.duckdb"),
+        master_db = S3.remote("recombia.planter/master-database.duckdb"),
         proteins = expand(rules.transdecoder.output.longest_orfs_pep, sample=config['samples']),
         duckdb = expand(rules.create_duckdb.output, sample=config['samples']),
     output:
