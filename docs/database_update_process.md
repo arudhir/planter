@@ -114,6 +114,39 @@ The database update process handles different schema versions by:
 4. **Backup before upgrading**: Create backups before performing schema upgrades
 5. **Consider versioning**: Use schema version control for significant changes
 
+## Testing Database Merges
+
+The Planter project includes a comprehensive test suite for verifying database merge operations:
+
+```python
+# Run the database merge tests
+python -m pytest tests/database/test_master_duckdb_merge.py -v
+```
+
+These tests verify:
+1. **Sample to test master merge**: Merging a test sample database into a test master database
+2. **Fixture to test master merge**: Merging a real fixture sample database into a master database
+3. **Production master merge**: Testing merge compatibility with the production master database
+
+To test merging a specific sample database into the master database:
+
+```python
+from planter.database.utils.duckdb_utils import merge_duckdbs
+
+# Test merge without actually changing the master database
+merged_db_path = merge_duckdbs(
+    duckdb_paths=["/path/to/sample.duckdb"],
+    master_db_path="test_master.duckdb",  # Use a test copy, not the real master
+    schema_sql_path="schema.sql"
+)
+
+# Verify the merge
+import duckdb
+conn = duckdb.connect(merged_db_path)
+count = conn.execute("SELECT COUNT(*) FROM sequences").fetchone()[0]
+print(f"Master database now has {count} sequences")
+```
+
 ## Troubleshooting
 
 If issues occur during database updates, check:
@@ -122,5 +155,7 @@ If issues occur during database updates, check:
 2. **Column mappings**: Check that column names match between versions
 3. **Clustering format**: Verify MMSeqs2 clustering output format
 4. **Transaction errors**: Look for transaction errors in the logs
+5. **Missing tables**: Verify that all required tables exist in both source and target databases
+6. **Constraint violations**: Check for NOT NULL constraint failures on required columns
 
 For more detailed information on schema versioning, see [schema_versioning.md](schema_versioning.md).
