@@ -4,6 +4,7 @@ from pathlib import Path
 import duckdb
 from typing import List, Union
 import pandas as pd
+from snakemake.io import StorageProvider
 
 from planter.database.utils.s3 import create_zip_archive, upload_to_s3
 from planter.database.utils.duckdb_utils import merge_duckdbs, update_duckdb_with_cluster_info
@@ -35,8 +36,8 @@ rule get_qc_stats:
             '--output_file {output.qc_stats}'
         )
 
-storage:
-    provider = "s3"
+# Define storage provider for S3 access
+storage = StorageProvider("s3")
 
 rule create_duckdb:
     input:
