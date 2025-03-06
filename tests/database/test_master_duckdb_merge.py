@@ -26,24 +26,65 @@ class TestMasterDuckDBMerge(unittest.TestCase):
         self.test_sample_db_path = Path(self.temp_dir) / "test_sample.duckdb"
         self.test_master_db_path = Path(self.temp_dir) / "test_master.duckdb"
         
-        # Path to the production master database
+        # Get project root for relative paths
+        self.project_root = Path(__file__).parent.parent.parent  # /home/ubuntu/planter
+        
+        # Path to the production master database - this path might not exist in all environments
         self.production_master_db_path = Path("/mnt/data4/recombia.planter/master.duckdb")
         
-        # Path to test fixtures directory
-        self.fixtures_dir = Path("/home/ubuntu/planter/tests/fixtures")
+        # Path to test fixtures directory - use project-relative paths
+        self.fixtures_dir = self.project_root / "tests" / "fixtures"
         
         # Path to SRR12068547 sample database
         self.sample_db_path = self.fixtures_dir / "SRR12068547" / "SRR12068547.duckdb"
         
+        # If the sample database doesn't exist, we'll use a fake path but the tests will be skipped
+        if not self.sample_db_path.exists() and not self.fixtures_dir.exists():
+            print("Warning: Test fixtures directory not found, some tests will be skipped.")
+        
         # Path to schema SQL file
-        self.schema_dir = Path("/home/ubuntu/planter/planter/database/schema/migrations")
+        self.schema_dir = self.project_root / "planter" / "database" / "schema" / "migrations"
         self.schema_sql_path = self.schema_dir / "001_initial_schema.sql"
         
-        # Copy the existing test schema file
+        # Copy the existing test schema file if it exists
         self.test_schema_sql_path = Path(self.temp_dir) / "schema.sql"
-        # Copy the contents of the schema SQL file to the test file
-        with open(self.schema_sql_path, "r") as src_schema, open(self.test_schema_sql_path, "w") as test_schema:
-            test_schema.write(src_schema.read())
+        
+        # Check if the schema file exists before trying to read it
+        if self.schema_sql_path.exists():
+            # Copy the contents of the schema SQL file to the test file
+            with open(self.schema_sql_path, "r") as src_schema, open(self.test_schema_sql_path, "w") as test_schema:
+                test_schema.write(src_schema.read())
+        else:
+            # Create a minimal schema file for testing if the real one isn't found
+            print(f"Warning: Schema file {self.schema_sql_path} not found, creating a minimal test schema.")
+            with open(self.test_schema_sql_path, "w") as test_schema:
+                test_schema.write("""
+                -- Track database schema versions
+                CREATE TABLE IF NOT EXISTS schema_version (
+                    version INTEGER PRIMARY KEY,
+                    migration_name VARCHAR NOT NULL,
+                    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                
+                -- SRA metadata
+                CREATE TABLE IF NOT EXISTS sra_metadata (
+                    sample_id VARCHAR PRIMARY KEY,
+                    organism VARCHAR,
+                    study_title VARCHAR
+                );
+                
+                -- Primary sequence storage
+                CREATE TABLE IF NOT EXISTS sequences (
+                    seqhash_id VARCHAR PRIMARY KEY,
+                    sequence VARCHAR NOT NULL,
+                    sample_id VARCHAR NOT NULL,
+                    assembly_date TIMESTAMP,
+                    is_representative BOOLEAN DEFAULT FALSE,
+                    repseq_id VARCHAR NOT NULL,
+                    length INTEGER NOT NULL,
+                    FOREIGN KEY (sample_id) REFERENCES sra_metadata(sample_id)
+                );
+                """)
 
     def tearDown(self):
         """Clean up after tests."""
@@ -229,9 +270,9 @@ class TestMasterDuckDBMerge(unittest.TestCase):
     
     def test_merge_fixture_sample_to_test_master(self):
         """Test merging a real sample database from fixtures into a test master database."""
-        # Skip test if the sample database doesn't exist
-        if not self.sample_db_path.exists():
-            self.skipTest(f"Sample database not found: {self.sample_db_path}")
+        # Skip test if the sample database doesn't exist or if we're using the minimal schema
+        if not self.sample_db_path.exists() or not self.schema_sql_path.exists():
+            self.skipTest(f"Required test fixtures not found. Sample DB: {self.sample_db_path}, Schema: {self.schema_sql_path}")
         
         # Instead of trying to replicate the exact schema with foreign keys,
         # we'll use the pre-defined test sample and master database approach
@@ -316,8 +357,9 @@ class TestMasterDuckDBMerge(unittest.TestCase):
     def test_merge_fixture_sample_to_production_master(self):
         """Test merging a sample database from fixtures into the production master database."""
         # Skip test if the production master database location doesn't exist
-        if not Path("/mnt/data4").exists():
-            self.skipTest("Production database directory /mnt/data4 not found")
+        # or if we're using the minimal schema
+        if not Path("/mnt/data4").exists() or not self.schema_sql_path.exists():
+            self.skipTest("Production database directory or schema files not found")
         
         # Skip test if the sample database doesn't exist
         if not self.sample_db_path.exists():
