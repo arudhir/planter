@@ -1,6 +1,6 @@
 # Core dependencies for Planter
 # These are essential for the application to run
-snakemake>=7.32.4
+snakemake>=7.32.4,<8.0.0
 snakemake-interface-storage-plugins>=3.0.0
 duckdb>=0.9.0
 pandas>=2.0.0
