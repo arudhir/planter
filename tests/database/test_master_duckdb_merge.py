@@ -293,8 +293,8 @@ class TestMasterDuckDBMerge(unittest.TestCase):
             schema_sql_path=self.test_schema_sql_path
         )
         
-        # Verify the merge results
-        conn = duckdb.connect(merged_db_path)
+        # Verify the merge results - make sure we use the actual returned path
+        conn = duckdb.connect(str(merged_db_path))
         
         # Check sra_metadata
         result = conn.execute("SELECT COUNT(*) FROM sra_metadata").fetchone()
@@ -386,8 +386,8 @@ class TestMasterDuckDBMerge(unittest.TestCase):
             upgrade_schema=False
         )
         
-        # Verify the merge results
-        conn = duckdb.connect(merged_db_path)
+        # Verify the merge results - make sure to convert path to string
+        conn = duckdb.connect(str(merged_db_path))
         
         # Check that the sample was added
         result = conn.execute(
