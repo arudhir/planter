@@ -98,8 +98,8 @@ rule filter_rrna:
 
 rule normalize:
     input:
-        r1 = temp(rules.filter_rrna.output.r1),
-        r2 = temp(rules.filter_rrna.output.r2)
+        r1 = rules.filter_rrna.output.r1,
+        r2 = rules.filter_rrna.output.r2
     output:
         r1 = Path(config['outdir']) / "{sample}/illumina/normalized/{sample}_normalized.1.fq.gz",
         r2 = Path(config['outdir']) / "{sample}/illumina/normalized/{sample}_normalized.2.fq.gz"

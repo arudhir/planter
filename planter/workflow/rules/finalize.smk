@@ -36,10 +36,7 @@ rule get_qc_stats:
         )
 
 storage:
-    provider = "s3",
-
-
-
+    provider = "s3"
 
 rule create_duckdb:
     input:
