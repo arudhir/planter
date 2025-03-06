@@ -1,5 +1,7 @@
 # Core dependencies for Planter
 # These are essential for the application to run
+# Pinning PuLP to a version that's compatible with Snakemake
+pulp==2.6.0
 snakemake>=7.32.4,<8.0.0
 snakemake-interface-storage-plugins>=3.0.0
 duckdb>=0.9.0
