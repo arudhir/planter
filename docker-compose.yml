@@ -15,7 +15,7 @@ services:
       - .:/usr/src/planter
       - /mnt/data:/mnt/data
       # - ./outputs:/usr/src/planter/outputs
-      - /mnt/data3/planter_outputs:/usr/src/planter/outputs
+      - /mnt/data4/planter_outputs:/usr/src/planter/outputs
       #- /mnt/data2/planter_outputs:/usr/src/planter/outputs
       - /mnt/data3/tmp:/tmp
       - ~/.aws:/root/.aws
