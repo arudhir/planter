@@ -16,6 +16,9 @@ dependencies = [
     "biopython",
     "pyyaml",
     "flask",
+    "seqhash",
+    "blake3",
+    "xlsxwriter"
 ]
 
 [project.scripts]

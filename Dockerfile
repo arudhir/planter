@@ -233,6 +233,23 @@ COPY requirements.txt .
 RUN uv pip install -r requirements.txt
 RUN uv pip install -e .
 
+# Patch Snakemake workflow.py to fix logger issues
+RUN python -c "import os, re; \
+workflow_path = '/opt/venv/lib/python3.12/site-packages/snakemake/workflow.py'; \
+content = open(workflow_path, 'r').read(); \
+patched = content \
+.replace('logger.run_info(', 'logger.info(\"Run info: \", ') \
+.replace('logger.resources_info(', 'logger.info(\"Resources info: \", ') \
+.replace('logger.host_info(', 'logger.info(\"Host info: \", ') \
+.replace('logger.logfile_hint(', 'logger.info(\"Logfile hint: \", ') \
+.replace('logger.get_logfile()', 'None'); \
+# Find and replace logger.info() calls that don't have a message parameter
+patched = re.sub(r'logger\.info\(\s*\)', 'logger.info(\"\")', patched); \
+# Comment out any remaining logfile_hint calls
+patched = re.sub(r'logger\.logfile_hint\(.*?\)', '# logger.logfile_hint call removed', patched); \
+open(workflow_path, 'w').write(patched); \
+print('Patched Snakemake workflow.py successfully')"
+
 # Create necessary directories
 RUN mkdir -p $APP_HOME/inputs $APP_HOME/outputs
 

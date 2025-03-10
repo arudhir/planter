@@ -1,0 +1,3 @@
+task_id	hash	native_id	name	status	exit	submit	duration	realtime	%cpu	peak_rss	peak_vmem	rchar	wchar
+1	b9/f89c46	125	DEBUG_ENVIRONMENT	COMPLETED	0	2025-03-06 18:55:21.536	457ms	418ms	100.9%	3.9 MB	10 MB	10.3 MB	4.6 KB
+2	66/a3e66b	142	READS_PROCESSING:DOWNLOAD_SRA (SRR23090413)	ABORTED	-	2025-03-06 18:55:21.551	-	-	-	-	-	-	-
