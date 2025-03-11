@@ -4,6 +4,9 @@ from pathlib import Path
 import duckdb
 from typing import List, Union
 import pandas as pd
+import time
+import shutil
+from datetime import datetime
 
 from planter.database.utils.s3 import create_zip_archive, upload_to_s3
 from planter.database.utils.duckdb_utils import merge_duckdbs, update_duckdb_with_cluster_info, extract_representative_sequences
@@ -35,9 +38,6 @@ rule get_qc_stats:
             '--output_file {output.qc_stats}'
         )
 
-storage:
-    provider = "s3"
-
 rule create_duckdb:
     input:
         analyze_eggnog = expand(rules.analyze_eggnog.output, sample=config['samples']),
@@ -62,15 +62,94 @@ rule fetch_master_db:
             'aws s3 cp s3://recombia.planter/master.duckdb {output.master_db}'
         )
 
+rule mmseqs_clustering:
+    input:
+        master_db = expand(rules.fetch_master_db.output),
+        proteins = expand(rules.transdecoder.output.longest_orfs_pep, sample=config['samples'])
+    output:
+        concat_proteins = temp(Path(config['outdir']) / 'tmp/concat_proteins.pep'),
+        repseq_path = temp(Path(config['outdir']) / 'tmp/repseq.faa'),
+        cluster_file = Path(config['outdir']) / 'tmp/newClusterDB.tsv',
+        done = temp(Path(config['outdir']) / 'tmp/mmseqs_clustering_done.txt')
+    params:
+        tmp_dir = Path(config["outdir"]) / "tmp"
+    log:
+        path = Path(config['outdir']) / 'logs' / 'mmseqs_clustering.log'
+    run:
+        # Set up logging to both file and console
+        log_file = str(log.path)
+        os.makedirs(os.path.dirname(log_file), exist_ok=True)
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            handlers=[
+                logging.FileHandler(log_file),
+                logging.StreamHandler()
+            ]
+        )
+        logger = logging.getLogger('mmseqs_clustering')
+        
+        logger.info(f"Starting MMSeqs clustering at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info(f"Processing samples: {config['samples']}")
+        
+        try:
+            # 1. Setup temp directory
+            logger.info(f"Setting up temporary directory at {params.tmp_dir}")
+            if os.path.exists(params.tmp_dir):
+                shutil.rmtree(params.tmp_dir)
+            os.makedirs(params.tmp_dir, exist_ok=True)
+
+            # 2. Concatenate all proteins
+            logger.info("Concatenating protein sequences")
+            with open(str(output.concat_proteins), 'wb') as concat_file:
+                for protein_file in input.proteins:
+                    with open(protein_file, 'rb') as pf:
+                        shutil.copyfileobj(pf, concat_file)
+            
+            # 3. Extract representative sequences
+            logger.info(f"Extracting representative sequences from {input.master_db}")
+            repseq_path = extract_representative_sequences(
+                db_path=input.master_db,
+                output_path=output.repseq_path
+            )
+            
+            # See how many sequences are in the repseq file - capture the output properly
+            repseq_count = subprocess.check_output(f"grep -c '>' {output.repseq_path}", shell=True).decode('utf-8').strip()
+            logger.info(f"Number of sequences in repseq file: {repseq_count}")
+
+            # 4. Run MMSeqs2 clustering update - use exactly the same command format as original
+            logger.info("Running MMSeqs2 clustering update")
+            start_time = time.time()
+            shell(
+                f"""
+                python ./planter/scripts/mmseqs_cluster_update.py -i {output.repseq_path} -o {params.tmp_dir} {output.concat_proteins}
+                """
+            )
+            clustering_time = time.time() - start_time
+            logger.info(f"MMSeqs2 clustering completed in {clustering_time:.2f} seconds")
+            
+            # Ensure the cluster file exists
+            if not os.path.exists(output.cluster_file):
+                raise FileNotFoundError(f"Expected cluster file not found at {output.cluster_file} after MMSeqs2 clustering")
+            
+            # 5. Mark as done
+            logger.info("MMSeqs clustering completed successfully")
+            shell(f"touch {output.done}")
+            
+        except Exception as e:
+            logger.error(f"Error in MMSeqs clustering: {str(e)}", exc_info=True)
+            raise
+
 rule update_database:
     input:
         master_db = expand(rules.fetch_master_db.output),
-        proteins = expand(rules.transdecoder.output.longest_orfs_pep, sample=config['samples']),
         duckdb = expand(rules.create_duckdb.output, sample=config['samples']),
+        mmseqs_done = rules.mmseqs_clustering.output.done,
+        concat_proteins = rules.mmseqs_clustering.output.concat_proteins,
+        repseq_path = rules.mmseqs_clustering.output.repseq_path,
+        cluster_file = rules.mmseqs_clustering.output.cluster_file
     output:
         updated_master = Path(config['outdir']) / 'updated_master.duckdb',
-        concat_proteins = temp(Path(config['outdir']) / 'tmp/concat_proteins.pep'),
-        repseq_path = temp(Path(config['outdir']) / 'tmp/repseq.faa'),
         done = temp(Path(config['outdir']) / 'tmp/update_database_done.txt')
     params:
         canonical_db = "s3://recombia.planter/master.duckdb",
@@ -81,11 +160,6 @@ rule update_database:
     log:
         path = Path(config['outdir']) / 'logs' / 'update_database.log'
     run:
-        import logging
-        import time
-        import shutil
-        from datetime import datetime
-        
         # Set up logging to both file and console
         log_file = str(log.path)
         os.makedirs(os.path.dirname(log_file), exist_ok=True)
@@ -100,21 +174,12 @@ rule update_database:
         logger = logging.getLogger('update_database')
         
         logger.info(f"Starting database update at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        logger.info(f"Processing samples: {config['samples']}")
         
         try:
-            # 1. Setup temp directory
-            logger.info(f"Setting up temporary directory at {params.tmp_dir}")
-            if os.path.exists(params.tmp_dir):
-                shutil.rmtree(params.tmp_dir)
-            os.makedirs(params.tmp_dir, exist_ok=True)
-
             # Create a local copy of the master database for processing
             local_master = str(output.updated_master)
             logger.info(f"Downloading local copy of master database at {local_master}")
             shell('aws s3 cp s3://recombia.planter/master.duckdb {local_master}')
-            
-            # shutil.copy(str(input.master_db), local_master)
             
             # Check and ensure schema compatibility
             schema_version, was_upgraded = ensure_compatibility(
@@ -126,50 +191,7 @@ rule update_database:
             else:
                 logger.info(f"Database schema version: {schema_version} (no upgrade needed)")
             
-            # 2. Concatenate all proteins
-            logger.info("Concatenating protein sequences")
-            with open(str(output.concat_proteins), 'wb') as concat_file:
-                for protein_file in input.proteins:
-                    with open(protein_file, 'rb') as pf:
-                        shutil.copyfileobj(pf, concat_file)
-            
-            # 3. Extract representative sequences from master DB
-            # local_master = str(input.master_db)
-            # logger.info("Extracting representative sequences from master database")
-            # shell(
-            #     f"""
-            #     duckdb {output.updated_master} -noheader -list -c "
-            #         SELECT 
-            #             '>' || seqhash_id || chr(10) || sequence
-            #         FROM 
-            #             sequences
-            #         WHERE 
-            #             repseq_id = seqhash_id;
-            #     " > {output.repseq_path}
-            #     """
-            # )
-            repseq_path = extract_representative_sequences(
-                db_path=input.master_db,
-                output_path=output.repseq_path
-            )
-            # import ipdb; ipdb.set_trace()
-            # See how many sequences are in the repseq file
-            repseq_count = shell(f"grep -c '>' {repseq_path}")
-            print(f"Number of sequences in repseq file: {repseq_count}")
-
-            # import ipdb; ipdb.set_trace()
-            # 4. Run MMSeqs2 clustering update
-            logger.info("Running MMSeqs2 clustering update")
-            start_time = time.time()
-            shell(
-                f"""
-                python ./planter/scripts/mmseqs_cluster_update.py -i {repseq_path} -o {params.tmp_dir} {output.concat_proteins}
-                """
-            )
-            clustering_time = time.time() - start_time
-            logger.info(f"MMSeqs2 clustering completed in {clustering_time:.2f} seconds")
-            
-            # 5. Merge sample DuckDBs into master DB with schema compatibility
+            # Merge sample DuckDBs into master DB with schema compatibility
             logger.info("Merging sample databases into master database")
             start_time = time.time()
             
@@ -192,9 +214,9 @@ rule update_database:
             merge_time = time.time() - start_time
             logger.info(f"Database merge completed in {merge_time:.2f} seconds")
             
-            # 6. Update the master DB with new cluster information
+            # Update the master DB with new cluster information
             logger.info("Updating master database with new cluster information")
-            cluster_file = params.tmp_dir / "newClusterDB.tsv"
+            cluster_file = input.cluster_file
             if not os.path.exists(cluster_file):
                 raise FileNotFoundError(f"Cluster file not found at {cluster_file}")
                 
@@ -208,7 +230,7 @@ rule update_database:
             update_time = time.time() - start_time
             logger.info(f"Cluster information update completed in {update_time:.2f} seconds")
             
-            # 7. Verify database integrity
+            # Verify database integrity
             logger.info("Verifying database integrity")
             con = duckdb.connect(local_master)
             try:
@@ -246,18 +268,18 @@ rule update_database:
             finally:
                 con.close()
             
-            # 8. Upload to S3
+            # Upload to S3
             logger.info(f"Uploading updated database to S3 at {params.canonical_db}")
             shell(f"aws s3 cp {local_master} {params.canonical_db}")
             
-            # 9. Mark as done
+            # Mark as done
             logger.info("Database update completed successfully")
             shell(f"touch {output.done}")
             
         except Exception as e:
             logger.error(f"Error updating database: {str(e)}", exc_info=True)
             raise
-
+            
 rule upload_to_s3:
     input:
         analyze_eggnog = expand(rules.analyze_eggnog.output, sample=config['samples']),

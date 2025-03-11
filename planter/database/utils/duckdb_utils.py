@@ -20,6 +20,7 @@ from Bio.SeqRecord import SeqRecord
 from planter.database.schema.schema_version import (SCHEMA_VERSIONS,
                                                     ensure_compatibility,
                                                     get_db_schema_version)
+from planter.database.builder import SequenceDBBuilder
 logger = logging.getLogger(__name__)
 
 
@@ -217,208 +218,117 @@ def merge_duckdbs(
 
 
 def update_duckdb_with_cluster_info(
-    db_path: Union[str, Path], tsv_path: Union[str, Path], upgrade_schema: bool = True
+    db_path: Union[str, Path], 
+    tsv_path: Union[str, Path],
+    upgrade_schema: bool = True
 ) -> None:
     """
-    Updates a DuckDB database with clustering information from an MMSeqs2 TSV file.
-    Handles schema compatibility across different versions.
-
-    Args:
-        db_path: Path to the DuckDB database file.
-        tsv_path: Path to the MMSeqs2 TSV file containing clustering data.
-        upgrade_schema: Whether to automatically upgrade the schema if needed (default: True)
+    Updates cluster information in a DuckDB database, working within the 
+    constraints of DuckDB's foreign key implementation.
     """
     db_path = str(db_path)
     tsv_path = str(tsv_path)
-
-    # Check and ensure schema compatibility
-    schema_version, was_upgraded = (
-        ensure_compatibility(db_path)
-        if upgrade_schema
-        else (get_db_schema_version(db_path), False)
-    )
-    if was_upgraded:
-        logger.info(
-            f"Database schema was automatically upgraded to version {schema_version}"
-        )
-
-    # Load the MMSeqs2 TSV into a DataFrame
-    df = pd.read_csv(
-        tsv_path, sep="\t", names=["representative_seqhash_id", "seqhash_id"]
-    )
-    df = df.drop_duplicates()
-
-    # Connect to DuckDB
+    
     con = duckdb.connect(db_path)
-
+    
     try:
-        logger.info(
-            f"Updating database '{db_path}' with MMSeqs2 clustering information from '{tsv_path}'"
-        )
-        logger.info(f"Database schema version: {schema_version}")
-        logger.info(f"Found {len(df)} cluster assignments")
-
-        # Begin transaction
         con.execute("BEGIN TRANSACTION")
-
-        # Create a temporary table for the MMSeqs2 data
-        con.execute(
-            """
-            CREATE TEMPORARY TABLE mmseqs2_clusters (
-                representative_seqhash_id VARCHAR,
-                seqhash_id VARCHAR
-            )
-        """
-        )
-
-        # Insert data into the temporary table
-        con.executemany(
-            "INSERT INTO mmseqs2_clusters VALUES (?, ?)", df.values.tolist()
-        )
-
-        # First, verify that all seqhash_ids exist in the sequences table
-        missing_seqs = con.execute(
-            """
-            SELECT DISTINCT mc.seqhash_id 
-            FROM mmseqs2_clusters mc
-            LEFT JOIN sequences s ON mc.seqhash_id = s.seqhash_id
-            WHERE s.seqhash_id IS NULL
-        """
-        ).fetchall()
-
-        if missing_seqs:
-            missing_count = len(missing_seqs)
-            logger.warning(
-                f"{missing_count} sequence IDs from cluster file not found in the database"
-            )
-            if missing_count > 10:
-                logger.warning(
-                    f"First 10 missing IDs: {[m[0] for m in missing_seqs[:10]]}"
-                )
-            else:
-                logger.warning(f"Missing IDs: {[m[0] for m in missing_seqs]}")
-
-        # Handle different schema versions
-        if schema_version >= 2:
-            # Schema version 2+ has is_representative column
-            logger.info("Using schema v2+ with is_representative column")
-
-            # Mark representative sequences in the sequences table
-            logger.info("Marking representative sequences in the sequences table")
-            con.execute(
-                """
-                UPDATE sequences 
-                SET is_representative = FALSE
-            """
-            )
-
-            logger.info("Setting is_representative to TRUE for representative sequences")
-            con.execute(
-                """
-                UPDATE sequences 
-                SET is_representative = TRUE
-                WHERE seqhash_id IN (
-                    SELECT DISTINCT representative_seqhash_id FROM mmseqs2_clusters
-                )
-            """
-            )
-        else:
-            # Schema version 1 doesn't have is_representative column
-            logger.info("Using schema v1 without is_representative column")
-
-        # Update the sequences table to assign the representative sequence - works in all versions
-        logger.info("Updating sequences table to assign representative sequence")
-        con.execute(
-            """
-            UPDATE sequences 
-            SET repseq_id = mm.representative_seqhash_id
-            FROM mmseqs2_clusters mm
-            WHERE sequences.seqhash_id = mm.seqhash_id
-        """
-        )
-
-        # Get the count of updated sequences for reporting
-        logger.info("Getting count of updated sequences")
-        updated_count = con.execute(
-            """
-            SELECT COUNT(DISTINCT seqhash_id) FROM mmseqs2_clusters
-        """
-        ).fetchone()[0]
-
-        # Clear existing cluster information to rebuild it
-        logger.info("Clearing existing cluster information")
-
-        # Delete cluster_members first
-        logger.info("Deleting cluster_members")
-        con.execute("DELETE FROM cluster_members")
-
-        # Now delete clusters
-        logger.info("Deleting clusters")
-        con.execute("DELETE FROM clusters")
-
-        # Insert new clusters into the clusters table
-        # Use proper cluster_id format: 'CLUSTER_nnn'
-        logger.info("Inserting new clusters into the clusters table")
-        con.execute(
-            """
+        
+        # 1. Load the cluster file into a temp table
+        con.execute(f"""
+            CREATE TEMP TABLE new_clustering AS
+            SELECT 
+                column0 AS rep_id,
+                column1 AS seq_id
+            FROM read_csv_auto('{tsv_path}', sep='\t', header=FALSE)
+        """)
+        
+        # 2. Update sequences table with representative info
+        con.execute("""
+            UPDATE sequences
+            SET repseq_id = nc.rep_id,
+                is_representative = (sequences.seqhash_id = nc.rep_id)
+            FROM new_clustering nc
+            WHERE sequences.seqhash_id = nc.seq_id
+        """)
+        
+        # 3. Create mapping between sequences and new cluster IDs
+        con.execute("""
+            CREATE TEMP TABLE cluster_assignments AS
+            SELECT 
+                rep_id,
+                'CLUSTER_' || ROW_NUMBER() OVER (ORDER BY rep_id) AS cluster_id,
+                COUNT(*) OVER (PARTITION BY rep_id) AS size
+            FROM new_clustering
+            GROUP BY rep_id
+        """)
+        
+        # 4. Update cluster_members (handle foreign key constraints)
+        # First, clear cluster_members for each sequence that will be reassigned
+        # (This avoids violating the PK constraint on seqhash_id)
+        con.execute("""
+            DELETE FROM cluster_members
+            WHERE seqhash_id IN (SELECT seq_id FROM new_clustering)
+        """)
+        
+        # Now safely insert new cluster memberships
+        con.execute("""
+            INSERT INTO cluster_members (seqhash_id, cluster_id)
+            SELECT nc.seq_id, ca.cluster_id
+            FROM new_clustering nc
+            JOIN cluster_assignments ca ON nc.rep_id = ca.rep_id
+        """)
+        
+        # 5. Update clusters table
+        # First, identify clusters that aren't used anymore
+        con.execute("""
+            CREATE TEMP TABLE unused_clusters AS
+            SELECT cluster_id 
+            FROM clusters
+            WHERE cluster_id NOT IN (SELECT cluster_id FROM cluster_members)
+        """)
+        
+        # Delete unused clusters (safe because no members reference them)
+        con.execute("""
+            DELETE FROM clusters
+            WHERE cluster_id IN (SELECT cluster_id FROM unused_clusters)
+        """)
+        
+        # Now insert new clusters
+        con.execute("""
             INSERT INTO clusters (cluster_id, representative_seqhash_id, size)
             SELECT 
-                'CLUSTER_' || ROW_NUMBER() OVER (ORDER BY representative_seqhash_id) as cluster_id,
-                representative_seqhash_id, 
-                COUNT(*) as size
-            FROM mmseqs2_clusters
-            GROUP BY representative_seqhash_id
-        """
-        )
-
-        # Insert cluster memberships into the cluster_members table
-        # Use ON CONFLICT to handle potential duplicates
-        logger.info("Inserting cluster memberships into the cluster_members table")
-        con.execute(
-            """
-            INSERT INTO cluster_members (seqhash_id, cluster_id)
-            SELECT m.seqhash_id, c.cluster_id 
-            FROM mmseqs2_clusters m
-            JOIN clusters c ON m.representative_seqhash_id = c.representative_seqhash_id
-            ON CONFLICT (seqhash_id) DO UPDATE SET cluster_id = EXCLUDED.cluster_id
-        """
-        )
-
-        # Get cluster statistics for reporting
-        logger.info("Getting cluster statistics for reporting")
-        cluster_stats = con.execute(
-            """
-            SELECT COUNT(*) as total_clusters, AVG(size) as avg_size, MAX(size) as max_size 
-            FROM clusters
-        """
-        ).fetchone()
-
-        # Commit transaction
-        logger.info("Committing transaction")
+                ca.cluster_id,
+                ca.rep_id,
+                ca.size
+            FROM cluster_assignments ca
+            WHERE NOT EXISTS (
+                SELECT 1 FROM clusters c WHERE c.representative_seqhash_id = ca.rep_id
+            )
+        """)
+        
+        # Update sizes for existing clusters
+        con.execute("""
+            UPDATE clusters
+            SET size = ca.size
+            FROM cluster_assignments ca
+            WHERE clusters.representative_seqhash_id = ca.rep_id
+        """)
+        
         con.execute("COMMIT")
-
-        # Report success statistics
-        logger.info(
-            f"Successfully updated {updated_count} sequences with new cluster assignments"
-        )
-        logger.info(
-            f"Created {cluster_stats[0]} clusters with average size {cluster_stats[1]:.1f} (max: {cluster_stats[2]})"
-        )
-
+        
     except Exception as e:
-        # Rollback on error
         con.execute("ROLLBACK")
-        logger.error(f"Error updating database: {str(e)}")
-        raise
+        raise e
     finally:
-        # Drop the temporary table and close connection
-        con.execute("DROP TABLE IF EXISTS mmseqs2_clusters")
+        # Clean up temp tables
+        for table in ["new_clustering", "cluster_assignments", "unused_clusters"]:
+            try:
+                con.execute(f"DROP TABLE IF EXISTS {table}")
+            except:
+                pass
         con.close()
-
-    logger.info(
-        f"Database '{db_path}' successfully updated with MMSeqs2 clustering information."
-    )
-
+        
 def extract_representative_sequences(
     db_path: Union[str, Path],
     output_path: Union[str, Path]
@@ -470,3 +380,14 @@ def extract_representative_sequences(
     finally:
         con.close()
     return output_path
+
+def create_duckdb(sample_id: str, outdir: str, duckdb_out: str):
+    """Create DuckDB database for the given sample ID."""
+
+    logger.info(f"Processing sample {sample_id}")
+    with SequenceDBBuilder(duckdb_out, output_dir=outdir) as builder:
+        results = builder.build_database([sample_id])
+        logger.info(f"Build results: {results}")
+
+        summary = builder.get_database_summary()
+        logger.info(f"Database summary: {summary}")

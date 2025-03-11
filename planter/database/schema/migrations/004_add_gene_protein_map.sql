@@ -1,7 +1,8 @@
 -- Add gene_protein_map table to link gene and protein sequence hashes
 CREATE TABLE IF NOT EXISTS gene_protein_map (
-    gene_seqhash_id VARCHAR PRIMARY KEY,
+    gene_seqhash_id VARCHAR,
     protein_seqhash_id VARCHAR NOT NULL,
+    PRIMARY KEY (gene_seqhash_id, protein_seqhash_id),
     FOREIGN KEY (protein_seqhash_id) REFERENCES sequences(seqhash_id)
 );
 
@@ -26,7 +27,3 @@ CREATE TABLE expression (
     FOREIGN KEY (gene_seqhash_id) REFERENCES gene_protein_map(gene_seqhash_id),
     FOREIGN KEY (sample_id) REFERENCES sra_metadata(sample_id)
 );
-
--- Copy data from backup, mapping seqhash_id to gene_seqhash_id
--- (This is only possible if the gene-protein relationships exist)
--- We'll handle the data migration in the loader code

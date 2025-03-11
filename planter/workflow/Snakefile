@@ -23,7 +23,7 @@ rule all:
         expand(rules.get_qc_stats.output, sample=samples),
         expand(rules.upload_to_s3.output, sample=samples),
         expand(rules.create_duckdb.output, sample=samples),
-        expand(rules.update_database.output.updated_master)
+        # expand(rules.update_database.output.updated_master)
         # expand(rules.cluster_update.output.new_repseq, sample=samples),
         # expand(rules.batch_cluster_update.output.done),
         # expand(rules.update_repseq.output.done_flag, sample=samples)
