@@ -20,7 +20,8 @@ dependencies = [
     "blake3",
     "xlsxwriter",
     "matplotlib",
-    "seaborn"
+    "seaborn",
+    "ipdb"
 ]
 
 [project.scripts]

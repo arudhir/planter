@@ -13,11 +13,13 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import duckdb
 import pandas as pd
+from Bio import SeqIO
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
 
 from planter.database.schema.schema_version import (SCHEMA_VERSIONS,
                                                     ensure_compatibility,
                                                     get_db_schema_version)
-
 logger = logging.getLogger(__name__)
 
 
@@ -302,6 +304,7 @@ def update_duckdb_with_cluster_info(
             logger.info("Using schema v2+ with is_representative column")
 
             # Mark representative sequences in the sequences table
+            logger.info("Marking representative sequences in the sequences table")
             con.execute(
                 """
                 UPDATE sequences 
@@ -309,6 +312,7 @@ def update_duckdb_with_cluster_info(
             """
             )
 
+            logger.info("Setting is_representative to TRUE for representative sequences")
             con.execute(
                 """
                 UPDATE sequences 
@@ -323,6 +327,7 @@ def update_duckdb_with_cluster_info(
             logger.info("Using schema v1 without is_representative column")
 
         # Update the sequences table to assign the representative sequence - works in all versions
+        logger.info("Updating sequences table to assign representative sequence")
         con.execute(
             """
             UPDATE sequences 
@@ -333,6 +338,7 @@ def update_duckdb_with_cluster_info(
         )
 
         # Get the count of updated sequences for reporting
+        logger.info("Getting count of updated sequences")
         updated_count = con.execute(
             """
             SELECT COUNT(DISTINCT seqhash_id) FROM mmseqs2_clusters
@@ -340,11 +346,19 @@ def update_duckdb_with_cluster_info(
         ).fetchone()[0]
 
         # Clear existing cluster information to rebuild it
+        logger.info("Clearing existing cluster information")
+
+        # Delete cluster_members first
+        logger.info("Deleting cluster_members")
         con.execute("DELETE FROM cluster_members")
+
+        # Now delete clusters
+        logger.info("Deleting clusters")
         con.execute("DELETE FROM clusters")
 
         # Insert new clusters into the clusters table
         # Use proper cluster_id format: 'CLUSTER_nnn'
+        logger.info("Inserting new clusters into the clusters table")
         con.execute(
             """
             INSERT INTO clusters (cluster_id, representative_seqhash_id, size)
@@ -359,6 +373,7 @@ def update_duckdb_with_cluster_info(
 
         # Insert cluster memberships into the cluster_members table
         # Use ON CONFLICT to handle potential duplicates
+        logger.info("Inserting cluster memberships into the cluster_members table")
         con.execute(
             """
             INSERT INTO cluster_members (seqhash_id, cluster_id)
@@ -370,6 +385,7 @@ def update_duckdb_with_cluster_info(
         )
 
         # Get cluster statistics for reporting
+        logger.info("Getting cluster statistics for reporting")
         cluster_stats = con.execute(
             """
             SELECT COUNT(*) as total_clusters, AVG(size) as avg_size, MAX(size) as max_size 
@@ -378,6 +394,7 @@ def update_duckdb_with_cluster_info(
         ).fetchone()
 
         # Commit transaction
+        logger.info("Committing transaction")
         con.execute("COMMIT")
 
         # Report success statistics
@@ -401,3 +418,55 @@ def update_duckdb_with_cluster_info(
     logger.info(
         f"Database '{db_path}' successfully updated with MMSeqs2 clustering information."
     )
+
+def extract_representative_sequences(
+    db_path: Union[str, Path],
+    output_path: Union[str, Path]
+) -> None:
+    """
+    Extracts representative sequences from a DuckDB database and saves them to a FASTA file.
+
+    Args:
+        db_path (Union[str, Path]): Path to the DuckDB database.
+        output_path (Union[str, Path]): Path to save the extracted representative sequences in FASTA format.
+
+    Returns:
+        None
+    """
+    # Ensure db_path and output_path are strings before converting to Path
+    db_path = Path(str(db_path)).resolve()
+    output_path = Path(str(output_path)).resolve()
+
+    logger.info(f"Extracting representative sequences from {db_path}")
+
+    query = """
+        SELECT seqhash_id, sequence
+        FROM sequences
+        WHERE repseq_id = seqhash_id;
+    """
+
+    try:
+        # Connect to DuckDB
+        con = duckdb.connect(str(db_path))
+
+        # Execute query and fetch results
+        results = con.execute(query).fetchall()
+
+        # Convert results to SeqRecords
+        seq_records = [
+            SeqRecord(Seq(seq), id=seq_id, description="")
+            for seq_id, seq in results
+        ]
+
+        # Write to FASTA file using SeqIO
+        with output_path.open("w") as fasta_file:
+            SeqIO.write(seq_records, fasta_file, "fasta")
+
+        logger.info(f"Successfully extracted {len(seq_records)} sequences to {output_path}")
+
+    except Exception as e:
+        logger.error(f"Error extracting sequences: {e}")
+
+    finally:
+        con.close()
+    return output_path

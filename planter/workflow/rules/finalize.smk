@@ -6,7 +6,7 @@ from typing import List, Union
 import pandas as pd
 
 from planter.database.utils.s3 import create_zip_archive, upload_to_s3
-from planter.database.utils.duckdb_utils import merge_duckdbs, update_duckdb_with_cluster_info
+from planter.database.utils.duckdb_utils import merge_duckdbs, update_duckdb_with_cluster_info, extract_representative_sequences
 from planter.database.schema.schema_version import get_db_schema_version, ensure_compatibility
 
 # Setup module logger
@@ -37,7 +37,7 @@ rule get_qc_stats:
 
 storage:
     provider = "s3"
-    
+
 rule create_duckdb:
     input:
         analyze_eggnog = expand(rules.analyze_eggnog.output, sample=config['samples']),
@@ -54,23 +54,32 @@ rule create_duckdb:
             ' --duckdb_out {output.duckdb}'
         )
 
+rule fetch_master_db:
+    output:
+        master_db = temp(Path(config['outdir']) / 'master.duckdb'),
+    run:
+        shell(
+            'aws s3 cp s3://recombia.planter/master.duckdb {output.master_db}'
+        )
+
 rule update_database:
     input:
-        master_db = storage.s3("s3://recombia.planter/master-database.duckdb"),
+        master_db = expand(rules.fetch_master_db.output),
         proteins = expand(rules.transdecoder.output.longest_orfs_pep, sample=config['samples']),
         duckdb = expand(rules.create_duckdb.output, sample=config['samples']),
     output:
         updated_master = Path(config['outdir']) / 'updated_master.duckdb',
-        concat_proteins = temp(Path(config['outdir']) / 'concat_proteins.pep'),
-        done = temp(Path(config['outdir']) / 'update_database_done.txt')
+        concat_proteins = temp(Path(config['outdir']) / 'tmp/concat_proteins.pep'),
+        repseq_path = temp(Path(config['outdir']) / 'tmp/repseq.faa'),
+        done = temp(Path(config['outdir']) / 'tmp/update_database_done.txt')
     params:
         canonical_db = "s3://recombia.planter/master.duckdb",
         tmp_dir = Path(config["outdir"]) / "tmp",
-        schema_path = Path('/usr/src/planter/planter/database/schema/migrations/001_initial_schema.sql'),
+        schema_path = Path('/usr/src/planter/planter/database/schema/migrations/004_add_gene_protein_map.sql'),
         # Target schema version (set to None to use latest available)
         target_schema_version = None
     log:
-        Path(config['outdir']) / 'logs' / 'update_database.log'
+        path = Path(config['outdir']) / 'logs' / 'update_database.log'
     run:
         import logging
         import time
@@ -94,10 +103,18 @@ rule update_database:
         logger.info(f"Processing samples: {config['samples']}")
         
         try:
+            # 1. Setup temp directory
+            logger.info(f"Setting up temporary directory at {params.tmp_dir}")
+            if os.path.exists(params.tmp_dir):
+                shutil.rmtree(params.tmp_dir)
+            os.makedirs(params.tmp_dir, exist_ok=True)
+
             # Create a local copy of the master database for processing
             local_master = str(output.updated_master)
-            logger.info(f"Creating local copy of master database at {local_master}")
-            shutil.copy(str(input.master_db), local_master)
+            logger.info(f"Downloading local copy of master database at {local_master}")
+            shell('aws s3 cp s3://recombia.planter/master.duckdb {local_master}')
+            
+            # shutil.copy(str(input.master_db), local_master)
             
             # Check and ensure schema compatibility
             schema_version, was_upgraded = ensure_compatibility(
@@ -109,35 +126,38 @@ rule update_database:
             else:
                 logger.info(f"Database schema version: {schema_version} (no upgrade needed)")
             
-            # 1. Setup temp directory
-            logger.info(f"Setting up temporary directory at {params.tmp_dir}")
-            if os.path.exists(params.tmp_dir):
-                shutil.rmtree(params.tmp_dir)
-            os.makedirs(params.tmp_dir, exist_ok=True)
-            
             # 2. Concatenate all proteins
             logger.info("Concatenating protein sequences")
-            with open(output.concat_proteins, 'wb') as concat_file:
+            with open(str(output.concat_proteins), 'wb') as concat_file:
                 for protein_file in input.proteins:
                     with open(protein_file, 'rb') as pf:
                         shutil.copyfileobj(pf, concat_file)
             
             # 3. Extract representative sequences from master DB
-            logger.info("Extracting representative sequences from master database")
-            repseq_path = params.tmp_dir / "repseq.faa"
-            shell(
-                f"""
-                duckdb {local_master} -noheader -list -c "
-                    SELECT 
-                        '>' || seqhash_id || chr(10) || sequence
-                    FROM 
-                        sequences
-                    WHERE 
-                        repseq_id = seqhash_id;
-                " > {repseq_path}
-                """
+            # local_master = str(input.master_db)
+            # logger.info("Extracting representative sequences from master database")
+            # shell(
+            #     f"""
+            #     duckdb {output.updated_master} -noheader -list -c "
+            #         SELECT 
+            #             '>' || seqhash_id || chr(10) || sequence
+            #         FROM 
+            #             sequences
+            #         WHERE 
+            #             repseq_id = seqhash_id;
+            #     " > {output.repseq_path}
+            #     """
+            # )
+            repseq_path = extract_representative_sequences(
+                db_path=input.master_db,
+                output_path=output.repseq_path
             )
-            
+            # import ipdb; ipdb.set_trace()
+            # See how many sequences are in the repseq file
+            repseq_count = shell(f"grep -c '>' {repseq_path}")
+            print(f"Number of sequences in repseq file: {repseq_count}")
+
+            # import ipdb; ipdb.set_trace()
             # 4. Run MMSeqs2 clustering update
             logger.info("Running MMSeqs2 clustering update")
             start_time = time.time()
