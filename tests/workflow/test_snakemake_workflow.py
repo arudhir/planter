@@ -20,7 +20,7 @@ from planter.database.builder import SequenceDBBuilder
 from planter.database.schema.schema_version import (ensure_compatibility,
                                                     get_db_schema_version)
 from planter.database.utils.duckdb_utils import (
-    merge_duckdbs, update_duckdb_with_cluster_info)
+    merge_duckdbs, update_clusters)
 
 
 @pytest.mark.slow
@@ -1121,8 +1121,10 @@ INSERT OR IGNORE INTO schema_version (version, migration_name) VALUES (4, 'test_
         # 6. Update with cluster info with error handling
         try:
             with patch("planter.database.utils.duckdb_utils.logger"):
-                update_duckdb_with_cluster_info(
-                    master_db_path, cluster_file, upgrade_schema=True
+                update_clusters(
+                    db_path=master_db_path,
+                    tsv_path=cluster_file,
+                    backup_first=True
                 )
         except Exception as e:
             print(f"Cluster update failed: {e}")

@@ -9,12 +9,16 @@ import shutil
 from datetime import datetime
 
 from planter.database.utils.s3 import create_zip_archive, upload_to_s3
-from planter.database.utils.duckdb_utils import merge_duckdbs, update_duckdb_with_cluster_info, extract_representative_sequences
 from planter.database.schema.schema_version import get_db_schema_version, ensure_compatibility
-
+from planter.database.utils.duckdb_utils import (
+    extract_representative_sequences, 
+    create_duckdb,
+    merge_duckdbs,
+    validate_duckdb_schema,
+    update_clusters
+)
 # Setup module logger
 logger = logging.getLogger(__name__)
-
 
 rule get_qc_stats:
     input:
@@ -47,16 +51,12 @@ rule create_duckdb:
     params:
         outdir = lambda wildcards: Path(config['outdir'])
     run:
-        shell(
-            'python ./planter/scripts/create_duckdb.py '
-            ' --sample_id {wildcards.sample} '
-            ' --outdir {params.outdir} '
-            ' --duckdb_out {output.duckdb}'
-        )
+        logger.info(f"Creating DuckDB for sample {wildcards.sample}")
+        create_duckdb(sample_id=wildcards.sample, outdir=params.outdir, duckdb_out=output.duckdb)
 
 rule fetch_master_db:
     output:
-        master_db = temp(Path(config['outdir']) / 'master.duckdb'),
+        master_db = temp(Path(config['outdir']) / 'master.duckdb.cpy'),
     run:
         shell(
             'aws s3 cp s3://recombia.planter/master.duckdb {output.master_db}'
@@ -76,18 +76,18 @@ rule mmseqs_clustering:
     log:
         path = Path(config['outdir']) / 'logs' / 'mmseqs_clustering.log'
     run:
-        # Set up logging to both file and console
-        log_file = str(log.path)
-        os.makedirs(os.path.dirname(log_file), exist_ok=True)
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler(log_file),
-                logging.StreamHandler()
-            ]
-        )
-        logger = logging.getLogger('mmseqs_clustering')
+        # # Set up logging to both file and console
+        # log_file = str(log.path)
+        # os.makedirs(os.path.dirname(log_file), exist_ok=True)
+        # logging.basicConfig(
+        #     level=logging.INFO,
+        #     format='%(asctime)s - %(levelname)s - %(message)s',
+        #     handlers=[
+        #         logging.FileHandler(log_file),
+        #         logging.StreamHandler()
+        #     ]
+        # )
+        # logger = logging.getLogger('mmseqs_clustering')
         
         logger.info(f"Starting MMSeqs clustering at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         logger.info(f"Processing samples: {config['samples']}")
@@ -142,18 +142,13 @@ rule mmseqs_clustering:
 
 rule update_database:
     input:
-        master_db = expand(rules.fetch_master_db.output),
         duckdb = expand(rules.create_duckdb.output, sample=config['samples']),
-        mmseqs_done = rules.mmseqs_clustering.output.done,
-        concat_proteins = rules.mmseqs_clustering.output.concat_proteins,
-        repseq_path = rules.mmseqs_clustering.output.repseq_path,
+        master_db = expand(rules.fetch_master_db.output),
         cluster_file = rules.mmseqs_clustering.output.cluster_file
     output:
-        updated_master = Path(config['outdir']) / 'updated_master.duckdb',
         done = temp(Path(config['outdir']) / 'tmp/update_database_done.txt')
     params:
         canonical_db = "s3://recombia.planter/master.duckdb",
-        tmp_dir = Path(config["outdir"]) / "tmp",
         schema_path = Path('/usr/src/planter/planter/database/schema/migrations/004_add_gene_protein_map.sql'),
         # Target schema version (set to None to use latest available)
         target_schema_version = None
@@ -176,37 +171,14 @@ rule update_database:
         logger.info(f"Starting database update at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
         try:
-            # Create a local copy of the master database for processing
-            local_master = str(output.updated_master)
-            logger.info(f"Downloading local copy of master database at {local_master}")
-            shell('aws s3 cp s3://recombia.planter/master.duckdb {local_master}')
-            
-            # Check and ensure schema compatibility
-            schema_version, was_upgraded = ensure_compatibility(
-                local_master,
-                required_version=params.target_schema_version
-            )
-            if was_upgraded:
-                logger.info(f"Database schema was automatically upgraded to version {schema_version}")
-            else:
-                logger.info(f"Database schema version: {schema_version} (no upgrade needed)")
-            
-            # Merge sample DuckDBs into master DB with schema compatibility
+            # Step 1: Merge all sample DuckDBs into master
             logger.info("Merging sample databases into master database")
-            start_time = time.time()
-            
-            # Check schema versions of sample databases
-            sample_schema_versions = {}
-            for sample_db in input.duckdb:
-                sample_version = get_db_schema_version(sample_db)
-                sample_schema_versions[str(sample_db)] = sample_version
-                
-            logger.info(f"Sample database schema versions: {sample_schema_versions}")
+            start_time = time.time()  # Move to decorator probably
             
             # Merge databases with schema compatibility
             master_db_path = merge_duckdbs(
                 duckdb_paths=input.duckdb,
-                master_db_path=local_master,
+                master_db_path=input.master_db,
                 schema_sql_path=params.schema_path,
                 upgrade_schema=True,
                 target_schema_version=params.target_schema_version
@@ -214,63 +186,41 @@ rule update_database:
             merge_time = time.time() - start_time
             logger.info(f"Database merge completed in {merge_time:.2f} seconds")
             
-            # Update the master DB with new cluster information
-            logger.info("Updating master database with new cluster information")
+            # Step 2: Update with cluster information
+            logger.info("Updating master database with cluster information")
             cluster_file = input.cluster_file
             if not os.path.exists(cluster_file):
                 raise FileNotFoundError(f"Cluster file not found at {cluster_file}")
                 
             start_time = time.time()
-            # Use schema compatibility features
-            update_duckdb_with_cluster_info(
-                local_master, 
-                cluster_file,
-                upgrade_schema=True
+            # Use the update_clusters function with logging
+            update_clusters(
+                db_path=input.master_db, 
+                tsv_path=cluster_file,
+                backup_first=True  # Adds .backup to the end of the file, so master.duckdb.cpy --> master.duckdb.cpy.backup
             )
             update_time = time.time() - start_time
             logger.info(f"Cluster information update completed in {update_time:.2f} seconds")
             
-            # Verify database integrity
-            logger.info("Verifying database integrity")
-            con = duckdb.connect(local_master)
+            # Step 3: Validate the database
+            logger.info("Validating database...")
             try:
-                # Get schema version for reporting
-                db_version = get_db_schema_version(local_master)
-                logger.info(f"Final database schema version: {db_version}")
-                
-                # Run basic integrity checks
-                tables = con.execute("SHOW TABLES").fetchall()
-                logger.info(f"Found {len(tables)} tables in database")
-                
-                # Check for basic stats
+                # Get basic statistics
+                con = duckdb.connect(str(output.updated_master))
                 sequence_count = con.execute("SELECT COUNT(*) FROM sequences").fetchone()[0]
-                cluster_count = con.execute("SELECT COUNT(*) FROM clusters").fetchone()[0]
+                cluster_count = con.execute("SELECT COUNT(*) FROM clusters").fetchone()[0] 
+                member_count = con.execute("SELECT COUNT(*) FROM cluster_members").fetchone()[0]
                 sample_count = con.execute("SELECT COUNT(DISTINCT sample_id) FROM sra_metadata").fetchone()[0]
                 
-                logger.info(f"Database summary: {sequence_count} sequences, {cluster_count} clusters, {sample_count} samples")
-                
-                # Verify that all sequences have a repseq_id
-                null_repseqs = con.execute("SELECT COUNT(*) FROM sequences WHERE repseq_id IS NULL").fetchone()[0]
-                if null_repseqs > 0:
-                    logger.warning(f"Warning: {null_repseqs} sequences have NULL repseq_id")
-                
-                # Schema-specific checks
-                if db_version >= 2:
-                    # Check representative flag consistency in v2+ schema
-                    inconsistent_reps = con.execute("""
-                        SELECT COUNT(*) FROM sequences 
-                        WHERE (is_representative = TRUE AND seqhash_id != repseq_id)
-                        OR (is_representative = FALSE AND seqhash_id = repseq_id)
-                    """).fetchone()[0]
-                    
-                    if inconsistent_reps > 0:
-                        logger.warning(f"Warning: {inconsistent_reps} sequences have inconsistent representative flags")
-            finally:
+                logger.info(f"Database summary: {sequence_count} sequences, {cluster_count} clusters, {member_count} cluster members, {sample_count} samples")
                 con.close()
+            except Exception as e:
+                logger.error(f"Error validating database: {str(e)}")
             
-            # Upload to S3
+            
+            # Step 4: Upload to S3 if needed
             logger.info(f"Uploading updated database to S3 at {params.canonical_db}")
-            shell(f"aws s3 cp {local_master} {params.canonical_db}")
+            shell(f"aws s3 cp {input.master_db}.backup {params.canonical_db}")
             
             # Mark as done
             logger.info("Database update completed successfully")
@@ -279,7 +229,9 @@ rule update_database:
         except Exception as e:
             logger.error(f"Error updating database: {str(e)}", exc_info=True)
             raise
-            
+
+
+
 rule upload_to_s3:
     input:
         analyze_eggnog = expand(rules.analyze_eggnog.output, sample=config['samples']),

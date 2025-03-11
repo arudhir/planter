@@ -14,6 +14,7 @@ import shutil
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Union
 import os
+import re
 import duckdb
 import pandas as pd
 from Bio import SeqIO
@@ -59,7 +60,8 @@ def merge_duckdbs(
     # First create the master database with the initial schema
     with duckdb.connect(master_db_path) as master_conn:
         # Set up the schema in the master database only if it doesn't exist
-        if not master_exists:
+        if not master_exists:   
+            import ipdb; ipdb.set_trace()  # It should always exist??
             try:
                 # Process the schema SQL to make it safer for execution
                 safe_schema_sql = _process_schema_sql_for_safety(schema_sql)
@@ -345,8 +347,9 @@ def update_clusters(
         backup_first: Whether to make a backup of the database first
         log_path: Path to save the log file (default: generated based on db_path)
     """
-    db_path = Path(db_path)
-    tsv_path = Path(tsv_path)
+    # import ipdb; ipdb.set_trace()
+    db_path = Path(str(db_path))
+    tsv_path = Path(str(tsv_path))
     
     # Set up logging
     if log_path is None:

@@ -7,7 +7,7 @@
 	dev-setup \
 	deploy \
 	clean clean-build clean-pyc \
-	dist release
+	dist release server
 
 # --- Environment---
 
@@ -57,6 +57,7 @@ help:
 	@echo "Common workflows:"
 	@echo "  make check test     - Validate code style and run tests"
 	@echo "  make reformat       - Format code and run linters"
+	@echo "  make server         - Start MMSeqs2 Server"
 	#
 # --- External execution ---
 

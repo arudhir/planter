@@ -13,7 +13,7 @@ import duckdb
 import pandas as pd
 
 from planter.database.utils.duckdb_utils import (
-    merge_duckdbs, update_duckdb_with_cluster_info)
+    merge_duckdbs, update_clusters)
 
 
 class TestDuckDBUtils(unittest.TestCase):
@@ -210,7 +210,11 @@ class TestDuckDBUtils(unittest.TestCase):
         shutil.copy(str(self.db1_path), str(self.master_db_path))
 
         # Update the database with cluster info
-        update_duckdb_with_cluster_info(self.master_db_path, self.cluster_tsv_path)
+        updated_db_path = update_clusters(
+            db_path=self.master_db_path,
+            tsv_path=self.cluster_tsv_path,
+            backup_first=True
+        )
 
         # Verify the updated database
         con = duckdb.connect(str(self.master_db_path))
@@ -336,7 +340,7 @@ class TestDuckDBUtils(unittest.TestCase):
                 f.write(f"{rep_id}\t{seq_id}\n")
 
         # Update merged database with cluster info
-        update_duckdb_with_cluster_info(merged_db_path, cluster_tsv)
+        update_clusters(merged_db_path, cluster_tsv)
 
         # Verify cluster update results
         con = duckdb.connect(merged_db_path)
