@@ -18,7 +18,9 @@ dependencies = [
     "flask",
     "seqhash",
     "blake3",
-    "xlsxwriter"
+    "xlsxwriter",
+    "matplotlib",
+    "seaborn"
 ]
 
 [project.scripts]

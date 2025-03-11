@@ -37,10 +37,7 @@ rule get_qc_stats:
 
 storage:
     provider = "s3"
-
-
-
-
+    
 rule create_duckdb:
     input:
         analyze_eggnog = expand(rules.analyze_eggnog.output, sample=config['samples']),
