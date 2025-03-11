@@ -336,7 +336,8 @@ def update_clusters(
     db_path: Union[str, Path], 
     tsv_path: Union[str, Path],
     backup_first: bool = True,
-    log_path: Union[str, Path] = None
+    log_path: Union[str, Path] = None,
+    handle_duplicates: str = "ignore"  # "replace", "ignore", or "error"
 ) -> None:
     """
     Update cluster information, skipping missing sequences and logging them.
@@ -346,10 +347,15 @@ def update_clusters(
         tsv_path: Path to the TSV file containing cluster information
         backup_first: Whether to make a backup of the database first
         log_path: Path to save the log file (default: generated based on db_path)
+        handle_duplicates: How to handle duplicate keys ("replace", "ignore", or "error")
     """
     # import ipdb; ipdb.set_trace()
     db_path = Path(str(db_path))
     tsv_path = Path(str(tsv_path))
+    
+    # Validate handle_duplicates parameter
+    if handle_duplicates not in ["replace", "ignore", "error"]:
+        raise ValueError(f"Invalid value for handle_duplicates: {handle_duplicates}")
     
     # Set up logging
     if log_path is None:
@@ -371,6 +377,7 @@ def update_clusters(
     
     logging.info(f"Starting cluster update for database: {db_path}")
     logging.info(f"Using clustering data from: {tsv_path}")
+    logging.info(f"Duplicate handling strategy: {handle_duplicates}")
     
     # Create a backup if requested
     if backup_first:
@@ -384,34 +391,7 @@ def update_clusters(
         logging.info("Beginning database transaction")
         con.execute("BEGIN TRANSACTION")
         
-        # Step 1: Drop the existing cluster tables
-        logging.info("Dropping existing cluster tables...")
-        try:
-            con.execute("DROP TABLE IF EXISTS cluster_members")
-            con.execute("DROP TABLE IF EXISTS clusters")
-        except Exception as e:
-            logging.warning(f"Error dropping tables: {str(e)}")
-        
-        # Step 2: Recreate the cluster tables
-        logging.info("Recreating cluster tables...")
-        con.execute("""
-            CREATE TABLE clusters (
-                cluster_id VARCHAR PRIMARY KEY,
-                representative_seqhash_id VARCHAR NOT NULL,
-                size INTEGER NOT NULL
-            )
-        """)
-        
-        con.execute("""
-            CREATE TABLE cluster_members (
-                seqhash_id VARCHAR PRIMARY KEY,
-                cluster_id VARCHAR NOT NULL,
-                FOREIGN KEY (seqhash_id) REFERENCES sequences(seqhash_id),
-                FOREIGN KEY (cluster_id) REFERENCES clusters(cluster_id)
-            )
-        """)
-        
-        # Step 3: Load the TSV file into a temp table
+        # Step 1: Load the TSV file into a temp table
         logging.info("Loading cluster data from TSV...")
         con.execute(f"""
             CREATE TEMP TABLE new_clustering AS
@@ -424,7 +404,71 @@ def update_clusters(
         total_entries = con.execute("SELECT COUNT(*) FROM new_clustering").fetchone()[0]
         logging.info(f"Loaded {total_entries} entries from clustering TSV")
         
-        # Step 4: Identify missing sequences
+        # Step 2: Check if we should handle duplicates preemptively
+        if handle_duplicates == "replace":
+            # Drop existing cluster tables
+            logging.info("Strategy is 'replace': Dropping existing cluster tables...")
+            try:
+                con.execute("DROP TABLE IF EXISTS cluster_members")
+                con.execute("DROP TABLE IF EXISTS clusters")
+            except Exception as e:
+                logging.warning(f"Error dropping tables: {str(e)}")
+                
+            # Recreate the cluster tables
+            logging.info("Recreating cluster tables...")
+            con.execute("""
+                CREATE TABLE clusters (
+                    cluster_id VARCHAR PRIMARY KEY,
+                    representative_seqhash_id VARCHAR NOT NULL,
+                    size INTEGER NOT NULL
+                )
+            """)
+            
+            con.execute("""
+                CREATE TABLE cluster_members (
+                    seqhash_id VARCHAR PRIMARY KEY,
+                    cluster_id VARCHAR NOT NULL,
+                    FOREIGN KEY (seqhash_id) REFERENCES sequences(seqhash_id),
+                    FOREIGN KEY (cluster_id) REFERENCES clusters(cluster_id)
+                )
+            """)
+        else:
+            # Check for potential duplicates if we're not replacing
+            cluster_members_count = 0
+            try:
+                cluster_members_count = con.execute("SELECT COUNT(*) FROM cluster_members").fetchone()[0]
+            except:
+                # Table might not exist
+                logging.info("cluster_members table doesn't exist yet, will create it")
+                con.execute("""
+                    CREATE TABLE IF NOT EXISTS clusters (
+                        cluster_id VARCHAR PRIMARY KEY,
+                        representative_seqhash_id VARCHAR NOT NULL,
+                        size INTEGER NOT NULL
+                    )
+                """)
+                
+                con.execute("""
+                    CREATE TABLE IF NOT EXISTS cluster_members (
+                        seqhash_id VARCHAR PRIMARY KEY,
+                        cluster_id VARCHAR NOT NULL,
+                        FOREIGN KEY (seqhash_id) REFERENCES sequences(seqhash_id),
+                        FOREIGN KEY (cluster_id) REFERENCES clusters(cluster_id)
+                    )
+                """)
+            
+            if cluster_members_count > 0 and handle_duplicates == "error":
+                # Look for potential duplicates that would cause errors
+                potential_duplicates = con.execute("""
+                    SELECT COUNT(*) FROM new_clustering nc
+                    JOIN cluster_members cm ON nc.seqhash_id = cm.seqhash_id
+                """).fetchone()[0]
+                
+                if potential_duplicates > 0:
+                    logging.warning(f"Found {potential_duplicates} potential duplicate entries that could cause errors")
+                    # We'll let the error happen naturally during insert
+        
+        # Step 3: Identify missing sequences
         logging.info("Identifying missing sequences...")
         
         # Find missing sequences
@@ -462,7 +506,7 @@ def update_clusters(
             for i, (seq_id,) in enumerate(missing_examples, 1):
                 logging.info(f"  {i}. {seq_id}")
         
-        # Step 5: Filter to only valid entries
+        # Step 4: Filter to only valid entries
         logging.info("Filtering to valid entries only...")
         con.execute("""
             CREATE TEMP TABLE valid_clustering AS
@@ -475,7 +519,7 @@ def update_clusters(
         valid_count = con.execute("SELECT COUNT(*) FROM valid_clustering").fetchone()[0]
         logging.info(f"Retained {valid_count}/{total_entries} entries after filtering")
         
-        # Step 6: Update sequences with representative info
+        # Step 5: Update sequences with representative info
         logging.info("Updating sequences with representative information...")
         con.execute("""
             UPDATE sequences
@@ -490,30 +534,54 @@ def update_clusters(
         ).fetchone()[0]
         logging.info(f"Updated {updated_count} sequences with representative info")
         
-        # Step 7: Insert clusters
+        # Step 6: Insert clusters
         logging.info("Creating clusters...")
-        con.execute("""
-            INSERT INTO clusters (cluster_id, representative_seqhash_id, size)
-            SELECT 
-                representative_seqhash_id AS cluster_id,
-                representative_seqhash_id,
-                COUNT(*) AS size
-            FROM valid_clustering
-            GROUP BY representative_seqhash_id
-        """)
+        if handle_duplicates == "ignore":
+            # Use INSERT OR IGNORE syntax
+            con.execute("""
+                INSERT OR IGNORE INTO clusters (cluster_id, representative_seqhash_id, size)
+                SELECT 
+                    representative_seqhash_id AS cluster_id,
+                    representative_seqhash_id,
+                    COUNT(*) AS size
+                FROM valid_clustering
+                GROUP BY representative_seqhash_id
+            """)
+        else:
+            # Normal insert (will error on duplicates if they exist and handle_duplicates="error")
+            con.execute("""
+                INSERT INTO clusters (cluster_id, representative_seqhash_id, size)
+                SELECT 
+                    representative_seqhash_id AS cluster_id,
+                    representative_seqhash_id,
+                    COUNT(*) AS size
+                FROM valid_clustering
+                GROUP BY representative_seqhash_id
+            """)
         
         cluster_count = con.execute("SELECT COUNT(*) FROM clusters").fetchone()[0]
         logging.info(f"Created {cluster_count} clusters")
         
-        # Step 8: Insert cluster memberships
+        # Step 7: Insert cluster memberships
         logging.info("Adding cluster memberships...")
-        con.execute("""
-            INSERT INTO cluster_members (seqhash_id, cluster_id)
-            SELECT DISTINCT 
-                seqhash_id, 
-                representative_seqhash_id AS cluster_id
-            FROM valid_clustering
-        """)
+        if handle_duplicates == "ignore":
+            # Use INSERT OR IGNORE syntax
+            con.execute("""
+                INSERT OR IGNORE INTO cluster_members (seqhash_id, cluster_id)
+                SELECT DISTINCT 
+                    seqhash_id, 
+                    representative_seqhash_id AS cluster_id
+                FROM valid_clustering
+            """)
+        else:
+            # Normal insert (will error on duplicates if they exist and handle_duplicates="error")
+            con.execute("""
+                INSERT INTO cluster_members (seqhash_id, cluster_id)
+                SELECT DISTINCT 
+                    seqhash_id, 
+                    representative_seqhash_id AS cluster_id
+                FROM valid_clustering
+            """)
         
         member_count = con.execute("SELECT COUNT(*) FROM cluster_members").fetchone()[0]
         logging.info(f"Added {member_count} cluster memberships")
