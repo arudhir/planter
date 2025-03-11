@@ -9,8 +9,11 @@ compatibility between different schema versions.
 """
 import logging
 from pathlib import Path
+import tempfile
+import shutil
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple, Union
-
+import os
 import duckdb
 import pandas as pd
 from Bio import SeqIO
@@ -327,6 +330,217 @@ def merge_duckdbs(
     logger.info(f"All databases have been merged into: {master_db_path}")
     return master_db_path
 
+def update_clusters(
+    db_path: Union[str, Path], 
+    tsv_path: Union[str, Path],
+    backup_first: bool = True,
+    log_path: Union[str, Path] = None
+) -> None:
+    """
+    Update cluster information, skipping missing sequences and logging them.
+    
+    Args:
+        db_path: Path to the DuckDB database file
+        tsv_path: Path to the TSV file containing cluster information
+        backup_first: Whether to make a backup of the database first
+        log_path: Path to save the log file (default: generated based on db_path)
+    """
+    db_path = Path(db_path)
+    tsv_path = Path(tsv_path)
+    
+    # Set up logging
+    if log_path is None:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_path = db_path.parent / f"cluster_update_{timestamp}.log"
+    
+    logging.basicConfig(
+        filename=log_path,
+        level=logging.INFO,
+        format="%(asctime)s - %(levelname)s - %(message)s"
+    )
+    
+    # Create console handler to display logs as well
+    console = logging.StreamHandler()
+    console.setLevel(logging.INFO)
+    formatter = logging.Formatter("%(message)s")
+    console.setFormatter(formatter)
+    logging.getLogger().addHandler(console)
+    
+    logging.info(f"Starting cluster update for database: {db_path}")
+    logging.info(f"Using clustering data from: {tsv_path}")
+    
+    # Create a backup if requested
+    if backup_first:
+        backup_path = f"{db_path}.backup"
+        logging.info(f"Creating backup at: {backup_path}")
+        shutil.copy2(db_path, backup_path)
+    
+    con = duckdb.connect(str(db_path))
+    
+    try:
+        logging.info("Beginning database transaction")
+        con.execute("BEGIN TRANSACTION")
+        
+        # Step 1: Drop the existing cluster tables
+        logging.info("Dropping existing cluster tables...")
+        try:
+            con.execute("DROP TABLE IF EXISTS cluster_members")
+            con.execute("DROP TABLE IF EXISTS clusters")
+        except Exception as e:
+            logging.warning(f"Error dropping tables: {str(e)}")
+        
+        # Step 2: Recreate the cluster tables
+        logging.info("Recreating cluster tables...")
+        con.execute("""
+            CREATE TABLE clusters (
+                cluster_id VARCHAR PRIMARY KEY,
+                representative_seqhash_id VARCHAR NOT NULL,
+                size INTEGER NOT NULL
+            )
+        """)
+        
+        con.execute("""
+            CREATE TABLE cluster_members (
+                seqhash_id VARCHAR PRIMARY KEY,
+                cluster_id VARCHAR NOT NULL,
+                FOREIGN KEY (seqhash_id) REFERENCES sequences(seqhash_id),
+                FOREIGN KEY (cluster_id) REFERENCES clusters(cluster_id)
+            )
+        """)
+        
+        # Step 3: Load the TSV file into a temp table
+        logging.info("Loading cluster data from TSV...")
+        con.execute(f"""
+            CREATE TEMP TABLE new_clustering AS
+            SELECT 
+                column0 AS representative_seqhash_id,
+                column1 AS seqhash_id
+            FROM read_csv_auto('{tsv_path}', sep='\t', header=FALSE)
+        """)
+        
+        total_entries = con.execute("SELECT COUNT(*) FROM new_clustering").fetchone()[0]
+        logging.info(f"Loaded {total_entries} entries from clustering TSV")
+        
+        # Step 4: Identify missing sequences
+        logging.info("Identifying missing sequences...")
+        
+        # Find missing sequences
+        con.execute("""
+            CREATE TEMP TABLE missing_sequences AS
+            SELECT DISTINCT seqhash_id
+            FROM new_clustering
+            WHERE NOT EXISTS (
+                SELECT 1 FROM sequences s WHERE s.seqhash_id = new_clustering.seqhash_id
+            )
+        """)
+        
+        # Find missing representatives
+        con.execute("""
+            CREATE TEMP TABLE missing_representatives AS
+            SELECT DISTINCT representative_seqhash_id
+            FROM new_clustering
+            WHERE NOT EXISTS (
+                SELECT 1 FROM sequences s WHERE s.seqhash_id = new_clustering.representative_seqhash_id
+            )
+        """)
+        
+        missing_seq_count = con.execute("SELECT COUNT(*) FROM missing_sequences").fetchone()[0]
+        missing_rep_count = con.execute("SELECT COUNT(*) FROM missing_representatives").fetchone()[0]
+        
+        logging.info(f"Found {missing_seq_count} unique sequences missing from database")
+        logging.info(f"Found {missing_rep_count} unique representatives missing from database")
+        
+        # Log some examples of missing sequences
+        if missing_seq_count > 0:
+            missing_examples = con.execute(
+                "SELECT seqhash_id FROM missing_sequences LIMIT 10"
+            ).fetchall()
+            logging.info("Examples of missing sequences:")
+            for i, (seq_id,) in enumerate(missing_examples, 1):
+                logging.info(f"  {i}. {seq_id}")
+        
+        # Step 5: Filter to only valid entries
+        logging.info("Filtering to valid entries only...")
+        con.execute("""
+            CREATE TEMP TABLE valid_clustering AS
+            SELECT nc.*
+            FROM new_clustering nc
+            WHERE EXISTS (SELECT 1 FROM sequences s1 WHERE s1.seqhash_id = nc.seqhash_id)
+              AND EXISTS (SELECT 1 FROM sequences s2 WHERE s2.seqhash_id = nc.representative_seqhash_id)
+        """)
+        
+        valid_count = con.execute("SELECT COUNT(*) FROM valid_clustering").fetchone()[0]
+        logging.info(f"Retained {valid_count}/{total_entries} entries after filtering")
+        
+        # Step 6: Update sequences with representative info
+        logging.info("Updating sequences with representative information...")
+        con.execute("""
+            UPDATE sequences
+            SET repseq_id = vc.representative_seqhash_id,
+                is_representative = (sequences.seqhash_id = vc.representative_seqhash_id)
+            FROM valid_clustering vc
+            WHERE sequences.seqhash_id = vc.seqhash_id
+        """)
+        
+        updated_count = con.execute(
+            "SELECT COUNT(*) FROM sequences WHERE repseq_id IS NOT NULL"
+        ).fetchone()[0]
+        logging.info(f"Updated {updated_count} sequences with representative info")
+        
+        # Step 7: Insert clusters
+        logging.info("Creating clusters...")
+        con.execute("""
+            INSERT INTO clusters (cluster_id, representative_seqhash_id, size)
+            SELECT 
+                representative_seqhash_id AS cluster_id,
+                representative_seqhash_id,
+                COUNT(*) AS size
+            FROM valid_clustering
+            GROUP BY representative_seqhash_id
+        """)
+        
+        cluster_count = con.execute("SELECT COUNT(*) FROM clusters").fetchone()[0]
+        logging.info(f"Created {cluster_count} clusters")
+        
+        # Step 8: Insert cluster memberships
+        logging.info("Adding cluster memberships...")
+        con.execute("""
+            INSERT INTO cluster_members (seqhash_id, cluster_id)
+            SELECT DISTINCT 
+                seqhash_id, 
+                representative_seqhash_id AS cluster_id
+            FROM valid_clustering
+        """)
+        
+        member_count = con.execute("SELECT COUNT(*) FROM cluster_members").fetchone()[0]
+        logging.info(f"Added {member_count} cluster memberships")
+        
+        # Log cluster statistics
+        avg_size = con.execute("SELECT AVG(size) FROM clusters").fetchone()[0]
+        max_size = con.execute("SELECT MAX(size) FROM clusters").fetchone()[0]
+        logging.info(f"Average cluster size: {avg_size:.2f}")
+        logging.info(f"Largest cluster size: {max_size}")
+        
+        # Commit the transaction
+        con.execute("COMMIT")
+        logging.info("Successfully updated cluster information")
+        logging.info(f"Log file saved to: {log_path}")
+        
+    except Exception as e:
+        con.execute("ROLLBACK")
+        logging.error(f"Error updating cluster information: {str(e)}")
+        raise
+    finally:
+        # Clean up temp tables
+        try:
+            for table in ["new_clustering", "missing_sequences", "missing_representatives", "valid_clustering"]:
+                con.execute(f"DROP TABLE IF EXISTS {table}")
+        except:
+            pass
+        con.close()
+    if backup_first:
+        return backup_path
+    return db_path
 
 def _process_schema_sql_for_safety(schema_sql: str) -> str:
     """
@@ -511,119 +725,25 @@ def _create_minimal_schema() -> str:
     INSERT OR IGNORE INTO schema_version (version, migration_name, applied_at) VALUES (2, 'minimal_schema', CURRENT_TIMESTAMP);
     """
 
-
-def update_duckdb_with_cluster_info(
-    db_path: Union[str, Path], 
-    tsv_path: Union[str, Path],
-    upgrade_schema: bool = True
-) -> None:
-    """
-    Updates cluster information in a DuckDB database, working within the 
-    constraints of DuckDB's foreign key implementation.
-    """
+def verify_database(db_path: Union[str, Path]):
+    """Verify key tables and their row counts"""
     db_path = str(db_path)
-    tsv_path = str(tsv_path)
     
     con = duckdb.connect(db_path)
-    
     try:
-        con.execute("BEGIN TRANSACTION")
+        # Get all tables
+        tables = con.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()
         
-        # 1. Load the cluster file into a temp table
-        con.execute(f"""
-            CREATE TEMP TABLE new_clustering AS
-            SELECT 
-                column0 AS rep_id,
-                column1 AS seq_id
-            FROM read_csv_auto('{tsv_path}', sep='\t', header=FALSE)
-        """)
-        
-        # 2. Update sequences table with representative info
-        con.execute("""
-            UPDATE sequences
-            SET repseq_id = nc.rep_id,
-                is_representative = (sequences.seqhash_id = nc.rep_id)
-            FROM new_clustering nc
-            WHERE sequences.seqhash_id = nc.seq_id
-        """)
-        
-        # 3. Create mapping between sequences and new cluster IDs
-        con.execute("""
-            CREATE TEMP TABLE cluster_assignments AS
-            SELECT 
-                rep_id,
-                'CLUSTER_' || ROW_NUMBER() OVER (ORDER BY rep_id) AS cluster_id,
-                COUNT(*) OVER (PARTITION BY rep_id) AS size
-            FROM new_clustering
-            GROUP BY rep_id
-        """)
-        
-        # 4. Update cluster_members (handle foreign key constraints)
-        # First, clear cluster_members for each sequence that will be reassigned
-        # (This avoids violating the PK constraint on seqhash_id)
-        con.execute("""
-            DELETE FROM cluster_members
-            WHERE seqhash_id IN (SELECT seq_id FROM new_clustering)
-        """)
-        
-        # Now safely insert new cluster memberships
-        con.execute("""
-            INSERT INTO cluster_members (seqhash_id, cluster_id)
-            SELECT nc.seq_id, ca.cluster_id
-            FROM new_clustering nc
-            JOIN cluster_assignments ca ON nc.rep_id = ca.rep_id
-        """)
-        
-        # 5. Update clusters table
-        # First, identify clusters that aren't used anymore
-        con.execute("""
-            CREATE TEMP TABLE unused_clusters AS
-            SELECT cluster_id 
-            FROM clusters
-            WHERE cluster_id NOT IN (SELECT cluster_id FROM cluster_members)
-        """)
-        
-        # Delete unused clusters (safe because no members reference them)
-        con.execute("""
-            DELETE FROM clusters
-            WHERE cluster_id IN (SELECT cluster_id FROM unused_clusters)
-        """)
-        
-        # Now insert new clusters
-        con.execute("""
-            INSERT INTO clusters (cluster_id, representative_seqhash_id, size)
-            SELECT 
-                ca.cluster_id,
-                ca.rep_id,
-                ca.size
-            FROM cluster_assignments ca
-            WHERE NOT EXISTS (
-                SELECT 1 FROM clusters c WHERE c.representative_seqhash_id = ca.rep_id
-            )
-        """)
-        
-        # Update sizes for existing clusters
-        con.execute("""
-            UPDATE clusters
-            SET size = ca.size
-            FROM cluster_assignments ca
-            WHERE clusters.representative_seqhash_id = ca.rep_id
-        """)
-        
-        con.execute("COMMIT")
-        
-    except Exception as e:
-        con.execute("ROLLBACK")
-        raise e
+        print("Database contains the following tables:")
+        for table_row in tables:
+            table_name = table_row[0]
+            row_count = con.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+            print(f"  - {table_name}: {row_count} rows")
     finally:
-        # Clean up temp tables
-        for table in ["new_clustering", "cluster_assignments", "unused_clusters"]:
-            try:
-                con.execute(f"DROP TABLE IF EXISTS {table}")
-            except:
-                pass
         con.close()
-        
+              
 def extract_representative_sequences(
     db_path: Union[str, Path],
     output_path: Union[str, Path]
@@ -687,3 +807,166 @@ def create_duckdb(sample_id: str, outdir: str, duckdb_out: str):
         summary = builder.get_database_summary()
         logger.info(f"Database summary: {summary}")
 
+def validate_duckdb_schema(db_path):
+    """Validate schema and relationships in the database."""
+    print(f"Validating database: {db_path}")
+    
+    with duckdb.connect(db_path) as con:
+        # 1. Get list of all tables
+        print("\n=== Tables in database ===")
+        tables = con.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+        for table in tables:
+            table_name = table[0]
+            count = con.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+            print(f"Table: {table_name} - {count} rows")
+        
+        # 2. Check schema of each table
+        print("\n=== Schema for each table ===")
+        for table in tables:
+            table_name = table[0]
+            print(f"\nSchema for {table_name}:")
+            schema = con.execute(f"PRAGMA table_info({table_name})").fetchall()
+            for col in schema:
+                print(f"  {col[1]} ({col[2]}){' PRIMARY KEY' if col[5] > 0 else ''}")
+        
+        # 3. Check the gene-protein relationships
+        print("\n=== Gene-Protein Relationships ===")
+        try:
+            gene_protein_stats = con.execute("""
+                SELECT 
+                    COUNT(DISTINCT gene_seqhash_id) AS total_genes,
+                    COUNT(DISTINCT protein_seqhash_id) AS total_proteins,
+                    COUNT(*) AS total_relationships
+                FROM gene_protein_map
+            """).fetchone()
+            
+            print(f"Total genes: {gene_protein_stats[0]}")
+            print(f"Total proteins: {gene_protein_stats[1]}")
+            print(f"Total gene-protein relationships: {gene_protein_stats[2]}")
+            
+            # Check for genes with multiple proteins
+            multi_protein_genes = con.execute("""
+                SELECT gene_seqhash_id, COUNT(protein_seqhash_id) as protein_count
+                FROM gene_protein_map
+                GROUP BY gene_seqhash_id
+                HAVING COUNT(protein_seqhash_id) > 1
+                ORDER BY COUNT(protein_seqhash_id) DESC
+                LIMIT 5
+            """).fetchall()
+            
+            if multi_protein_genes:
+                print("\nTop 5 genes with multiple proteins:")
+                for gene in multi_protein_genes:
+                    print(f"  Gene {gene[0]} has {gene[1]} proteins")
+                    # Sample of proteins for this gene
+                    proteins = con.execute(f"""
+                        SELECT protein_seqhash_id 
+                        FROM gene_protein_map 
+                        WHERE gene_seqhash_id = '{gene[0]}'
+                        LIMIT 3
+                    """).fetchall()
+                    for protein in proteins:
+                        print(f"    - {protein[0]}")
+        except Exception as e:
+            print(f"Error checking gene-protein relationships: {e}")
+        
+        # 4. Check expression data and linkage to genes
+        print("\n=== Expression Data ===")
+        try:
+            expr_stats = con.execute("""
+                SELECT 
+                    COUNT(DISTINCT gene_seqhash_id) AS genes_with_expression,
+                    COUNT(DISTINCT sample_id) AS samples_with_expression,
+                    AVG(tpm) AS avg_tpm
+                FROM expression
+            """).fetchone()
+            
+            print(f"Genes with expression data: {expr_stats[0]}")
+            print(f"Samples with expression data: {expr_stats[1]}")
+            print(f"Average TPM: {expr_stats[2]:.2f}")
+            
+            # Check gene-expression-protein linkage
+            gene_expr_protein = con.execute("""
+                SELECT 
+                    COUNT(DISTINCT e.gene_seqhash_id) AS genes_with_expr_and_protein,
+                    COUNT(DISTINCT gpm.protein_seqhash_id) AS proteins_linked_to_expr
+                FROM expression e
+                JOIN gene_protein_map gpm ON e.gene_seqhash_id = gpm.gene_seqhash_id
+            """).fetchone()
+            
+            print(f"Genes with both expression and protein mappings: {gene_expr_protein[0]}")
+            print(f"Proteins linked to genes with expression: {gene_expr_protein[1]}")
+        except Exception as e:
+            print(f"Error checking expression data: {e}")
+        
+        # 5. Check annotations
+        print("\n=== Annotation Data ===")
+        try:
+            anno_stats = con.execute("""
+                SELECT 
+                    COUNT(*) AS total_annotations,
+                    COUNT(DISTINCT sample_id) AS samples_with_annotations
+                FROM annotations
+            """).fetchone()
+            
+            print(f"Total annotated sequences: {anno_stats[0]}")
+            print(f"Samples with annotations: {anno_stats[1]}")
+            
+            # Check annotation-sequence-gene-expression linkage
+            anno_gene_expr = con.execute("""
+                SELECT 
+                    COUNT(DISTINCT a.seqhash_id) AS annotated_proteins,
+                    COUNT(DISTINCT gpm.gene_seqhash_id) AS genes_of_annotated_proteins,
+                    COUNT(DISTINCT e.gene_seqhash_id) AS genes_with_annotation_and_expression
+                FROM annotations a
+                JOIN sequences s ON a.seqhash_id = s.seqhash_id
+                JOIN gene_protein_map gpm ON s.seqhash_id = gpm.protein_seqhash_id
+                LEFT JOIN expression e ON gpm.gene_seqhash_id = e.gene_seqhash_id
+            """).fetchone()
+            
+            print(f"Annotated proteins: {anno_gene_expr[0]}")
+            print(f"Genes of annotated proteins: {anno_gene_expr[1]}")
+            print(f"Genes with both annotation and expression: {anno_gene_expr[2]}")
+        except Exception as e:
+            print(f"Error checking annotation data: {e}")
+        
+        # 6. Check clusters
+        print("\n=== Cluster Data ===")
+        try:
+            cluster_stats = con.execute("""
+                SELECT 
+                    COUNT(DISTINCT cluster_id) AS total_clusters,
+                    AVG(size) AS avg_cluster_size,
+                    MAX(size) AS largest_cluster
+                FROM clusters
+            """).fetchone()
+            
+            print(f"Total clusters: {cluster_stats[0]}")
+            print(f"Average cluster size: {cluster_stats[1]:.2f}")
+            print(f"Largest cluster size: {cluster_stats[2]}")
+            
+            # Check cluster members
+            member_stats = con.execute("""
+                SELECT 
+                    COUNT(DISTINCT seqhash_id) AS unique_members,
+                    COUNT(*) AS total_membership_records
+                FROM cluster_members
+            """).fetchone()
+            
+            print(f"Unique sequences in clusters: {member_stats[0]}")
+            print(f"Total cluster membership records: {member_stats[1]}")
+            
+            # Get top clusters
+            top_clusters = con.execute("""
+                SELECT cluster_id, size
+                FROM clusters
+                ORDER BY size DESC
+                LIMIT 3
+            """).fetchall()
+            
+            if top_clusters:
+                print("\nTop 3 largest clusters:")
+                for cluster in top_clusters:
+                    print(f"  Cluster {cluster[0]}: {cluster[1]} members")
+        except Exception as e:
+            print(f"Error checking cluster data: {e}")
