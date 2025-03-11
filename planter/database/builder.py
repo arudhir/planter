@@ -437,6 +437,31 @@ class SequenceDBBuilder:
             self.logger.info("Created cluster_members table")
         except Exception as e:
             self.logger.error(f"Failed to create cluster_members table: {str(e)}")
+        
+        # 10. Create kegg_info table
+        try:
+            self.con.execute("""
+                CREATE TABLE IF NOT EXISTS kegg_info (
+                    seqhash_id VARCHAR PRIMARY KEY,
+                    kegg_ko VARCHAR,
+                    kegg_pathway VARCHAR,
+                    kegg_module VARCHAR,
+                    kegg_reaction VARCHAR,
+                    kegg_rclass VARCHAR,
+                    brite VARCHAR,
+                    kegg_tc VARCHAR,
+                    cazy VARCHAR,
+                    bigg_reaction VARCHAR,
+                    pfams VARCHAR,
+                    sample_id VARCHAR,
+                    FOREIGN KEY (seqhash_id) REFERENCES sequences(seqhash_id),
+                    FOREIGN KEY (sample_id) REFERENCES sra_metadata(sample_id)
+                )
+            """)
+            self.logger.info("Created kegg_info table")
+        except Exception as e:
+            self.logger.error(f"Failed to create kegg_info table: {str(e)}")
+
 
     def _check_incomplete_migration(self):
         """Check if there's an incomplete migration by looking for backup tables."""
@@ -838,6 +863,9 @@ class SequenceDBBuilder:
 
     def _process_annotations(self, sample_id: str) -> int:
         """Process annotations from temporary table into final tables."""
+        # Make sure the kegg_info table exists
+        self._ensure_kegg_info_table_exists()
+        
         # Main annotations
         self.con.execute(
             f"""
@@ -891,7 +919,69 @@ class SequenceDBBuilder:
         """
         )
 
+        # Add KEGG information in a separate transaction
+        try:
+            with self.transaction():
+                self.con.execute(
+                    f"""
+                    INSERT INTO kegg_info
+                    SELECT DISTINCT
+                        query as seqhash_id,
+                        "KEGG_ko" as kegg_ko,
+                        "KEGG_Pathway" as kegg_pathway,
+                        "KEGG_Module" as kegg_module,
+                        "KEGG_Reaction" as kegg_reaction,
+                        "KEGG_rclass" as kegg_rclass,
+                        "BRITE" as brite,
+                        "KEGG_TC" as kegg_tc,
+                        "CAZy" as cazy,
+                        "BiGG_Reaction" as bigg_reaction,
+                        "PFAMs" as pfams,
+                        '{sample_id}' as sample_id
+                    FROM temp_annotations
+                    WHERE query IN (SELECT seqhash_id FROM sequences)
+                    AND query NOT IN (SELECT seqhash_id FROM kegg_info)
+                    AND ("KEGG_ko" != '-' OR "KEGG_Pathway" != '-' OR 
+                        "KEGG_Module" != '-' OR "KEGG_Reaction" != '-' OR
+                        "KEGG_rclass" != '-' OR "BRITE" != '-' OR 
+                        "KEGG_TC" != '-' OR "CAZy" != '-' OR 
+                        "BiGG_Reaction" != '-' OR "PFAMs" != '-')
+                """
+                )
+                self.logger.info(f"Added KEGG information for {sample_id}")
+        except Exception as e:
+            self.logger.error(f"Failed to add KEGG information: {str(e)}")
+            # Continue despite KEGG insertion failure
+        
         return annotations_loaded
+
+    def _ensure_kegg_info_table_exists(self):
+        """Create the kegg_info table if it doesn't exist."""
+        try:
+            with self.transaction():
+                self.con.execute("""
+                    CREATE TABLE IF NOT EXISTS kegg_info (
+                        seqhash_id VARCHAR PRIMARY KEY,
+                        kegg_ko VARCHAR,
+                        kegg_pathway VARCHAR,
+                        kegg_module VARCHAR,
+                        kegg_reaction VARCHAR,
+                        kegg_rclass VARCHAR,
+                        brite VARCHAR,
+                        kegg_tc VARCHAR,
+                        cazy VARCHAR,
+                        bigg_reaction VARCHAR,
+                        pfams VARCHAR,
+                        sample_id VARCHAR,
+                        FOREIGN KEY (seqhash_id) REFERENCES sequences(seqhash_id),
+                        FOREIGN KEY (sample_id) REFERENCES sra_metadata(sample_id)
+                    )
+                """)
+                self.logger.info("Created kegg_info table")
+        except Exception as e:
+            self.logger.error(f"Failed to create kegg_info table: {str(e)}")
+
+
 
     def _check_sample_exists(self, sample_id: str) -> bool:
         """Check if a sample ID already exists in the database."""
