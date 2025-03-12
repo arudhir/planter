@@ -192,7 +192,7 @@ rule update_database:
             # Use the update_clusters function with logging
             update_clusters(
                 db_path=input.master_db, 
-                tsv_path=cluster_file,
+                tsv_path=input.cluster_file,
                 backup_first=True,  # Adds .backup to the end of the file, so master.duckdb.cpy --> master.duckdb.cpy.backup
                 handle_duplicates="ignore"
             )
