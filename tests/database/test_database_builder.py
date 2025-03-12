@@ -296,10 +296,9 @@ class TestSequenceDBBuilder(unittest.TestCase):
             f.write("seq1\tseq3\n")
 
         # Update the database with clustering information
-        from planter.database.utils.duckdb_utils import \
-            update_duckdb_with_cluster_info
+        from planter.database.utils.duckdb_utils import update_clusters
 
-        update_duckdb_with_cluster_info(db_path, cluster_tsv_path)
+        update_clusters(db_path, cluster_tsv_path, handle_duplicates="ignore")
 
         # Verify the results by connecting to the updated database
         with duckdb.connect(db_path) as con:

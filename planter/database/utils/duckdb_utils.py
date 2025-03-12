@@ -522,13 +522,30 @@ def update_clusters(
         
         # Step 5: Update sequences with representative info
         logging.info("Updating sequences with representative information...")
-        con.execute("""
-            UPDATE sequences
-            SET repseq_id = vc.representative_seqhash_id,
-                is_representative = (sequences.seqhash_id = vc.representative_seqhash_id)
-            FROM valid_clustering vc
-            WHERE sequences.seqhash_id = vc.seqhash_id
-        """)
+        
+        # Check if is_representative column exists
+        column_exists = con.execute("""
+            SELECT COUNT(*) FROM pragma_table_info('sequences') 
+            WHERE name = 'is_representative'
+        """).fetchone()[0] > 0
+        
+        if column_exists:
+            con.execute("""
+                UPDATE sequences
+                SET repseq_id = vc.representative_seqhash_id,
+                    is_representative = (sequences.seqhash_id = vc.representative_seqhash_id)
+                FROM valid_clustering vc
+                WHERE sequences.seqhash_id = vc.seqhash_id
+            """)
+        else:
+            # Update without is_representative column
+            con.execute("""
+                UPDATE sequences
+                SET repseq_id = vc.representative_seqhash_id
+                FROM valid_clustering vc
+                WHERE sequences.seqhash_id = vc.seqhash_id
+            """)
+            logging.info("Note: is_representative column not found in sequences table, skipping that update")
         
         updated_count = con.execute(
             "SELECT COUNT(*) FROM sequences WHERE repseq_id IS NOT NULL"
