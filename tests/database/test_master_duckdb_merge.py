@@ -127,8 +127,9 @@ class TestMasterDuckDBMerge(unittest.TestCase):
         # Add gene_protein_map table and expression table (schema v2+)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS gene_protein_map (
-                gene_seqhash_id VARCHAR PRIMARY KEY,
+                gene_seqhash_id VARCHAR,
                 protein_seqhash_id VARCHAR NOT NULL,
+                PRIMARY KEY (gene_seqhash_id, protein_seqhash_id),
                 FOREIGN KEY (protein_seqhash_id) REFERENCES sequences(seqhash_id)
             )
         """)
@@ -184,8 +185,9 @@ class TestMasterDuckDBMerge(unittest.TestCase):
         # Add gene_protein_map table and expression table (schema v2+)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS gene_protein_map (
-                gene_seqhash_id VARCHAR PRIMARY KEY,
+                gene_seqhash_id VARCHAR,
                 protein_seqhash_id VARCHAR NOT NULL,
+                PRIMARY KEY (gene_seqhash_id, protein_seqhash_id),
                 FOREIGN KEY (protein_seqhash_id) REFERENCES sequences(seqhash_id)
             )
         """)
