@@ -56,7 +56,7 @@ rule create_duckdb:
 
 rule fetch_master_db:
     output:
-        master_db = temp(Path(config['outdir']) / 'master.duckdb.cpy'),
+        master_db = Path(config['outdir']) / 'master.duckdb.cpy',
     run:
         shell(
             'aws s3 cp s3://recombia.planter/master.duckdb {output.master_db}'
@@ -143,7 +143,7 @@ rule mmseqs_clustering:
 rule update_database:
     input:
         duckdb = expand(rules.create_duckdb.output, sample=config['samples']),
-        master_db = expand(rules.fetch_master_db.output),
+        master_db = rules.fetch_master_db.output,
         cluster_file = rules.mmseqs_clustering.output.cluster_file
     output:
         done = temp(Path(config['outdir']) / 'tmp/update_database_done.txt')
@@ -172,10 +172,9 @@ rule update_database:
         
         try:
             # Step 1: Merge all sample DuckDBs into master
-            logger.info("Merging sample databases into master database")
-            start_time = time.time()  # Move to decorator probably
-            
+            logger.info("Merging sample databases into master database")            
             # Merge databases with schema compatibility
+            start_time = time.time()
             master_db_path = merge_duckdbs(
                 duckdb_paths=input.duckdb,
                 master_db_path=input.master_db,
@@ -188,16 +187,14 @@ rule update_database:
             
             # Step 2: Update with cluster information
             logger.info("Updating master database with cluster information")
-            cluster_file = input.cluster_file
-            if not os.path.exists(cluster_file):
-                raise FileNotFoundError(f"Cluster file not found at {cluster_file}")
                 
             start_time = time.time()
             # Use the update_clusters function with logging
             update_clusters(
                 db_path=input.master_db, 
                 tsv_path=cluster_file,
-                backup_first=True  # Adds .backup to the end of the file, so master.duckdb.cpy --> master.duckdb.cpy.backup
+                backup_first=True,  # Adds .backup to the end of the file, so master.duckdb.cpy --> master.duckdb.cpy.backup
+                handle_duplicates="ignore"
             )
             update_time = time.time() - start_time
             logger.info(f"Cluster information update completed in {update_time:.2f} seconds")
@@ -206,7 +203,7 @@ rule update_database:
             logger.info("Validating database...")
             try:
                 # Get basic statistics
-                con = duckdb.connect(str(output.updated_master))
+                con = duckdb.connect(str(input.master_db))
                 sequence_count = con.execute("SELECT COUNT(*) FROM sequences").fetchone()[0]
                 cluster_count = con.execute("SELECT COUNT(*) FROM clusters").fetchone()[0] 
                 member_count = con.execute("SELECT COUNT(*) FROM cluster_members").fetchone()[0]

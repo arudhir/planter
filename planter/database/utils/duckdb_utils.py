@@ -61,7 +61,7 @@ def merge_duckdbs(
     with duckdb.connect(master_db_path) as master_conn:
         # Set up the schema in the master database only if it doesn't exist
         if not master_exists:   
-            import ipdb; ipdb.set_trace()  # It should always exist??
+            # Master DB should exist but handle the case if it doesn't
             try:
                 # Process the schema SQL to make it safer for execution
                 safe_schema_sql = _process_schema_sql_for_safety(schema_sql)
@@ -337,7 +337,7 @@ def update_clusters(
     tsv_path: Union[str, Path],
     backup_first: bool = True,
     log_path: Union[str, Path] = None,
-    handle_duplicates: str = "ignore"  # "replace", "ignore", or "error"
+    handle_duplicates: str = "replace"  # "replace", "ignore", or "error"
 ) -> None:
     """
     Update cluster information, skipping missing sequences and logging them.
@@ -349,7 +349,6 @@ def update_clusters(
         log_path: Path to save the log file (default: generated based on db_path)
         handle_duplicates: How to handle duplicate keys ("replace", "ignore", or "error")
     """
-    # import ipdb; ipdb.set_trace()
     db_path = Path(str(db_path))
     tsv_path = Path(str(tsv_path))
     
@@ -426,12 +425,14 @@ def update_clusters(
             
             con.execute("""
                 CREATE TABLE cluster_members (
-                    seqhash_id VARCHAR PRIMARY KEY,
+                    seqhash_id VARCHAR NOT NULL,
                     cluster_id VARCHAR NOT NULL,
+                    PRIMARY KEY (seqhash_id, cluster_id),
                     FOREIGN KEY (seqhash_id) REFERENCES sequences(seqhash_id),
                     FOREIGN KEY (cluster_id) REFERENCES clusters(cluster_id)
                 )
             """)
+            
         else:
             # Check for potential duplicates if we're not replacing
             cluster_members_count = 0
@@ -562,29 +563,72 @@ def update_clusters(
         cluster_count = con.execute("SELECT COUNT(*) FROM clusters").fetchone()[0]
         logging.info(f"Created {cluster_count} clusters")
         
-        # Step 7: Insert cluster memberships
-        logging.info("Adding cluster memberships...")
-        if handle_duplicates == "ignore":
-            # Use INSERT OR IGNORE syntax
+        # Step 7: Insert cluster memberships with explicit duplicate handling
+        logging.info("Adding cluster memberships with careful duplicate handling...")
+        
+        # Create a temporary table of what we want to insert
+        con.execute("""
+            CREATE TEMP TABLE mem_to_insert AS
+            SELECT DISTINCT 
+                seqhash_id, 
+                representative_seqhash_id AS cluster_id
+            FROM valid_clustering
+        """)
+        
+        # For ignore or error strategies, we need to check for existing entries
+        if handle_duplicates != "replace" and con.execute("SELECT COUNT(*) FROM cluster_members").fetchone()[0] > 0:
+            # Remove entries that would cause duplicates
+            logging.info("Checking for duplicate memberships...")
+            con.execute("""
+                CREATE TEMP TABLE existing_members AS
+                SELECT seqhash_id, cluster_id FROM cluster_members
+            """)
+            
+            # Count how many would cause duplicates
+            duplicates = con.execute("""
+                SELECT COUNT(*) FROM mem_to_insert m
+                WHERE EXISTS (
+                    SELECT 1 FROM existing_members e
+                    WHERE e.seqhash_id = m.seqhash_id AND e.cluster_id = m.cluster_id
+                )
+            """).fetchone()[0]
+            logging.info(f"Found {duplicates} entries that would cause duplicates")
+            
+            if handle_duplicates == "ignore":
+                # Remove entries that would cause duplicates
+                con.execute("""
+                    DELETE FROM mem_to_insert m
+                    WHERE EXISTS (
+                        SELECT 1 FROM existing_members e
+                        WHERE e.seqhash_id = m.seqhash_id AND e.cluster_id = m.cluster_id
+                    )
+                """)
+                logging.info(f"Filtered out {duplicates} duplicate entries")
+        
+        # Now insert only the non-duplicate entries
+        insert_count = 0
+        if handle_duplicates == "ignore" or handle_duplicates == "replace":
+            # Safe insert with no errors
             con.execute("""
                 INSERT OR IGNORE INTO cluster_members (seqhash_id, cluster_id)
-                SELECT DISTINCT 
-                    seqhash_id, 
-                    representative_seqhash_id AS cluster_id
-                FROM valid_clustering
+                SELECT seqhash_id, cluster_id 
+                FROM mem_to_insert
             """)
+            insert_count = con.execute("SELECT COUNT(*) FROM mem_to_insert").fetchone()[0]
         else:
-            # Normal insert (will error on duplicates if they exist and handle_duplicates="error")
+            # With "error" strategy, we'll just let it fail if there are duplicates
             con.execute("""
                 INSERT INTO cluster_members (seqhash_id, cluster_id)
-                SELECT DISTINCT 
-                    seqhash_id, 
-                    representative_seqhash_id AS cluster_id
-                FROM valid_clustering
+                SELECT seqhash_id, cluster_id
+                FROM mem_to_insert
             """)
+            insert_count = con.execute("SELECT COUNT(*) FROM mem_to_insert").fetchone()[0]
         
+        logging.info(f"Inserted {insert_count} cluster memberships")
+        
+        # Log final counts
         member_count = con.execute("SELECT COUNT(*) FROM cluster_members").fetchone()[0]
-        logging.info(f"Added {member_count} cluster memberships")
+        logging.info(f"Final cluster_members count: {member_count}")
         
         # Log cluster statistics
         avg_size = con.execute("SELECT AVG(size) FROM clusters").fetchone()[0]
@@ -604,7 +648,8 @@ def update_clusters(
     finally:
         # Clean up temp tables
         try:
-            for table in ["new_clustering", "missing_sequences", "missing_representatives", "valid_clustering"]:
+            for table in ["new_clustering", "missing_sequences", "missing_representatives", 
+                         "valid_clustering", "mem_to_insert", "existing_members"]:
                 con.execute(f"DROP TABLE IF EXISTS {table}")
         except:
             pass
