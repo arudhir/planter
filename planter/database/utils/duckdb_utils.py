@@ -278,14 +278,44 @@ def merge_duckdbs(
                                     logger.error(f"Error during batch processing of {table}: {str(e)}")
                             elif table == "expression":
                                 # Ensure we only insert expression records with valid gene references
+                                # First make sure gene_protein_map entries exist for these genes
+                                try:
+                                    # Get all genes from the expression table that need to be in gene_protein_map
+                                    gene_ids = master_conn.execute(
+                                        f"""
+                                        SELECT DISTINCT gene_seqhash_id 
+                                        FROM {alias}.{table} 
+                                        WHERE gene_seqhash_id NOT IN (
+                                            SELECT gene_seqhash_id FROM gene_protein_map
+                                        )
+                                        """
+                                    ).fetchall()
+                                    
+                                    # For each missing gene, try to find a matching protein and add an entry
+                                    for (gene_id,) in gene_ids:
+                                        # Try to find a protein with matching ID pattern (removing .p1, etc.)
+                                        base_id = gene_id.split('.')[0] if '.' in gene_id else gene_id
+                                        protein_query = f"{base_id}.p1"
+                                        
+                                        # Add gene-protein mapping if the protein exists
+                                        master_conn.execute(
+                                            f"""
+                                            INSERT OR IGNORE INTO gene_protein_map (gene_seqhash_id, protein_seqhash_id)
+                                            VALUES ('{gene_id}', '{protein_query}')
+                                            """
+                                        )
+                                except Exception as e:
+                                    logger.warning(f"Error ensuring gene_protein_map entries: {str(e)}")
+                                
+                                # Now insert expression data that has valid gene mappings
                                 master_conn.execute(
                                     f"""
                                     INSERT OR IGNORE INTO {table} ({col_str})
                                     SELECT e.{col_str} 
                                     FROM {alias}.{table} e
                                     WHERE EXISTS (
-                                        SELECT 1 FROM sequences s
-                                        WHERE s.seqhash_id = e.gene_seqhash_id
+                                        SELECT 1 FROM gene_protein_map gpm
+                                        WHERE gpm.gene_seqhash_id = e.gene_seqhash_id
                                     )
                                     """
                                 )
