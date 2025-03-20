@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS sra_metadata (
     library_layout VARCHAR NULL,
     instrument VARCHAR NULL,
     run_spots VARCHAR NULL,
-    run_bases VARCHAR NULL,
+    run_bases BIGINT NULL,
     run_published VARCHAR NULL
 );
 
