@@ -295,7 +295,7 @@ class SequenceDBBuilder:
                     library_layout VARCHAR,
                     instrument VARCHAR,
                     run_spots INTEGER,
-                    run_bases INTEGER,
+                    run_bases BIGINT,
                     run_published TIMESTAMP
                 )
             """)
