@@ -6,10 +6,10 @@ build-backend = "setuptools.build_meta"
 name = "planter"
 version = "0.1.0"
 description = "Bioinformatics pipeline for genomic analysis"
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 dependencies = [
     "snakemake>=7.32.4",
-    "snakemake-storage-plugin-s3",
+    "snakemake-storage-plugin-s3==0.3.1",
     "duckdb",
     "pandas",
     "numpy",
@@ -21,7 +21,8 @@ dependencies = [
     "xlsxwriter",
     "matplotlib",
     "seaborn",
-    "ipdb"
+    "ipdb",
+    "pytest>=8.3.2",
 ]
 
 [project.scripts]
