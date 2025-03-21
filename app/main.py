@@ -205,6 +205,99 @@ def create_app(config_name='default'):
             app.logger.error(f"Create refseq error: {str(e)}")
             return jsonify({'status': 'error', 'message': str(e)}), 500
             
+    @app.route('/get_preset_query', methods=['GET'])
+    def get_preset_query():
+        """Gets a preset SQL query template."""
+        query_name = request.args.get('query_name')
+        if not query_name:
+            return jsonify({'status': 'error', 'message': 'No query name provided'}), 400
+            
+        # Load the SQL query from the database directory
+        try:
+            query_file = f"/home/ubuntu/planter/planter/database/queries/sql/{query_name}.sql"
+            if not os.path.exists(query_file):
+                return jsonify({'status': 'error', 'message': f"Query '{query_name}' not found"}), 404
+                
+            with open(query_file, 'r') as f:
+                query_sql = f.read()
+                
+            return jsonify({
+                'status': 'success',
+                'query': query_sql
+            })
+        except Exception as e:
+            app.logger.error(f"Get preset query error: {str(e)}")
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+            
+    @app.route('/execute_query', methods=['POST'])
+    def execute_query():
+        """Executes a SQL query against the DuckDB database."""
+        try:
+            # Get the query from the request
+            data = request.json
+            if not data or 'query' not in data:
+                return jsonify({'status': 'error', 'message': 'No query provided'}), 400
+                
+            query = data['query'].strip()
+            if not query:
+                return jsonify({'status': 'error', 'message': 'Empty query'}), 400
+                
+            # Check if the database exists
+            db_path = app.config['DUCKDB_PATH']
+            if not os.path.exists(db_path):
+                return jsonify({
+                    'status': 'error',
+                    'message': f"Database file not found at {db_path}. Please download it first."
+                }), 404
+                
+            # Block unsafe operations
+            unsafe_operations = ['CREATE', 'DROP', 'ALTER', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'VACUUM']
+            for operation in unsafe_operations:
+                if operation in query.upper():
+                    return jsonify({
+                        'status': 'error',
+                        'message': f"Unsafe operation '{operation}' is not allowed"
+                    }), 403
+                    
+            # Execute the query with a timeout
+            app.logger.info(f"Executing query: {query}")
+            
+            try:
+                # Limited to 10 seconds execution time
+                with duckdb.connect(db_path) as conn:
+                    result = conn.execute(query).fetchdf()
+                    
+                # Convert the result to a list of dictionaries
+                results = result.to_dict(orient='records')
+                columns = result.columns.tolist()
+                
+                # Apply a limit on the number of results to avoid overwhelming the UI
+                max_results = 1000
+                if len(results) > max_results:
+                    results = results[:max_results]
+                    truncated = True
+                else:
+                    truncated = False
+                    
+                response = {
+                    'status': 'success',
+                    'results': results,
+                    'columns': columns,
+                    'truncated': truncated,
+                    'row_count': len(results),
+                    'total_rows': len(result) if truncated else len(results)
+                }
+                
+                return jsonify(response)
+                
+            except Exception as e:
+                app.logger.error(f"Query execution error: {str(e)}")
+                return jsonify({'status': 'error', 'message': f"Query execution failed: {str(e)}"}), 500
+                
+        except Exception as e:
+            app.logger.error(f"Execute query error: {str(e)}")
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+            
     @app.route('/run_pipeline', methods=['POST'])
     def run_pipeline():
         """Runs the Planter pipeline with the specified samples."""

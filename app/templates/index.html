@@ -141,6 +141,95 @@
             border-radius: 4px;
             display: none;
         }
+        /* Query tab styling */
+        .query-container {
+            display: flex;
+            gap: 20px;
+            margin-top: 15px;
+        }
+        .query-editor {
+            flex: 1;
+            min-width: 400px;
+        }
+        .query-results {
+            flex: 1;
+            overflow-x: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            min-height: 400px;
+        }
+        #sqlQuery {
+            width: 100%;
+            height: 120px;
+            font-family: 'Courier New', monospace;
+            margin-bottom: 10px;
+        }
+        .pre-made-queries {
+            margin-bottom: 10px;
+        }
+        #presetQueries {
+            padding: 8px;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        .query-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .clear-button {
+            background-color: #f44336;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .clear-button:hover {
+            background-color: #d32f2f;
+        }
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .results-table th {
+            background-color: #f1f1f1;
+            padding: 8px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        .results-table td {
+            padding: 8px;
+            border: 1px solid #ddd;
+            max-width: 300px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .results-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .results-pagination {
+            margin-top: 10px;
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+        }
+        .pagination-button {
+            padding: 5px 10px;
+            border: 1px solid #ddd;
+            background-color: #f1f1f1;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        .pagination-button:hover {
+            background-color: #ddd;
+        }
+        .pagination-info {
+            padding: 5px 10px;
+        }
     </style>
 </head>
 <body>
@@ -155,6 +244,7 @@
         <button class="tablinks active" onclick="openTab(event, 'SearchTab')">MMSeqs2 Search</button>
         <button class="tablinks" onclick="openTab(event, 'PipelineTab')">Run Pipeline</button>
         <button class="tablinks" onclick="openTab(event, 'DatabaseTab')">Database Management</button>
+        <button class="tablinks" onclick="openTab(event, 'QueryTab')">Database Query</button>
     </div>
 
     <!-- MMSeqs2 Search Tab -->
@@ -230,6 +320,53 @@ One sample per line"></textarea>
             <div id="progressText" class="progress-text">Preparing download...</div>
         </div>
     </div>
+    
+    <!-- Database Query Tab -->
+    <div id="QueryTab" class="tabcontent">
+        <h2>Database Query</h2>
+        <p>Run SQL queries against the database or choose a pre-made query:</p>
+        
+        <div class="query-container">
+            <div class="query-editor">
+                <div class="pre-made-queries">
+                    <label for="presetQueries">Pre-made Queries:</label>
+                    <select id="presetQueries">
+                        <option value="">-- Select a query --</option>
+                        <option value="database_summary">Database Summary</option>
+                        <option value="organism_summary">Organism Summary</option>
+                        <option value="sample_stats">Sample Statistics</option>
+                        <option value="top_expressed_sequences">Top Expressed Sequences</option>
+                        <option value="go_term_summary">GO Term Summary</option>
+                        <option value="ec_number_summary">EC Number Summary</option>
+                        <option value="cluster_stats">Cluster Statistics</option>
+                        <option value="expression_distribution">Expression Distribution</option>
+                    </select>
+                </div>
+                
+                <textarea id="sqlQuery" placeholder="SELECT * FROM sequences LIMIT 10;"></textarea>
+                
+                <div class="query-buttons">
+                    <button type="button" id="runQuery" class="run-button">Run Query</button>
+                    <button type="button" id="clearResults" class="clear-button">Clear Results</button>
+                </div>
+                
+                <div id="queryStatus" class="status"></div>
+                
+                <!-- Progress bar for query execution -->
+                <div id="queryProgressContainer" class="progress-container">
+                    <div class="progress">
+                        <div id="queryProgressBar" class="progress-bar" role="progressbar">0%</div>
+                    </div>
+                    <div id="queryProgressText" class="progress-text">Executing query...</div>
+                </div>
+            </div>
+            
+            <div class="query-results">
+                <h3>Results</h3>
+                <div id="resultsContainer"></div>
+            </div>
+        </div>
+    </div>
 
     <script>
         // Tab switching function
@@ -266,6 +403,216 @@ One sample per line"></textarea>
                     alert('Error: Failed to load example sequence');
                 });
             });
+            
+            // Database Query Tab functionality
+            $('#presetQueries').change(function() {
+                const selectedQuery = $(this).val();
+                if (selectedQuery) {
+                    // Show loading state
+                    $('#queryStatus').removeClass('success error').hide();
+                    $('#queryProgressContainer').show();
+                    $('#queryProgressBar').css('width', '0%').text('0%');
+                    $('#queryProgressText').text('Loading query...');
+                    
+                    // Fetch the selected query template
+                    $.ajax({
+                        url: '/get_preset_query',
+                        type: 'GET',
+                        data: { query_name: selectedQuery },
+                        success: function(response) {
+                            if (response.query) {
+                                $('#sqlQuery').val(response.query);
+                                $('#queryProgressContainer').hide();
+                            } else {
+                                $('#queryStatus')
+                                    .addClass('error')
+                                    .text(response.message || 'Failed to load query template')
+                                    .show();
+                            }
+                        },
+                        error: function(xhr) {
+                            $('#queryProgressContainer').hide();
+                            let errorMessage = 'Failed to load query template';
+                            if (xhr.responseJSON && xhr.responseJSON.message) {
+                                errorMessage = xhr.responseJSON.message;
+                            }
+                            $('#queryStatus')
+                                .addClass('error')
+                                .text(errorMessage)
+                                .show();
+                        }
+                    });
+                }
+            });
+            
+            // Run SQL query
+            $('#runQuery').click(function() {
+                const btn = $(this);
+                const originalText = btn.text();
+                const query = $('#sqlQuery').val();
+                
+                if (!query) {
+                    alert('Please enter a SQL query');
+                    return;
+                }
+                
+                // Show loading state
+                btn.text('Executing...').prop('disabled', true);
+                $('#queryStatus').removeClass('success error').hide();
+                $('#queryProgressContainer').show();
+                $('#queryProgressBar').css('width', '0%').text('0%');
+                $('#queryProgressText').text('Executing query...');
+                
+                // Execute the query
+                $.ajax({
+                    url: '/execute_query',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ query: query }),
+                    success: function(response) {
+                        $('#queryProgressContainer').hide();
+                        
+                        if (response.status === 'success') {
+                            $('#queryStatus')
+                                .addClass('success')
+                                .text('Query executed successfully')
+                                .show();
+                            
+                            // Display the results
+                            displayQueryResults(response.results, response.columns);
+                        } else {
+                            $('#queryStatus')
+                                .addClass('error')
+                                .text(response.message || 'Query execution failed')
+                                .show();
+                        }
+                    },
+                    error: function(xhr) {
+                        $('#queryProgressContainer').hide();
+                        let errorMessage = 'Query execution failed';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMessage = xhr.responseJSON.message;
+                        }
+                        $('#queryStatus')
+                            .addClass('error')
+                            .text(errorMessage)
+                            .show();
+                    },
+                    complete: function() {
+                        btn.text(originalText).prop('disabled', false);
+                    }
+                });
+            });
+            
+            // Clear results
+            $('#clearResults').click(function() {
+                $('#resultsContainer').empty();
+                $('#queryStatus').removeClass('success error').hide();
+            });
+            
+            // Function to display query results as a paginated table
+            function displayQueryResults(results, columns) {
+                const container = $('#resultsContainer');
+                container.empty();
+                
+                if (!results || results.length === 0) {
+                    container.html('<p>No results found</p>');
+                    return;
+                }
+                
+                // Create the table
+                const table = $('<table class="results-table"></table>');
+                
+                // Add the header row
+                const headerRow = $('<tr></tr>');
+                columns.forEach(column => {
+                    headerRow.append(`<th>${column}</th>`);
+                });
+                table.append($('<thead></thead>').append(headerRow));
+                
+                // Add the data rows (paginated)
+                const tbody = $('<tbody></tbody>');
+                const pageSize = 15;
+                let currentPage = 1;
+                const totalPages = Math.ceil(results.length / pageSize);
+                
+                // Function to render a page of results
+                function renderPage(page) {
+                    tbody.empty();
+                    const startIdx = (page - 1) * pageSize;
+                    const endIdx = Math.min(startIdx + pageSize, results.length);
+                    
+                    for (let i = startIdx; i < endIdx; i++) {
+                        const row = $('<tr></tr>');
+                        columns.forEach(column => {
+                            let cellValue = results[i][column];
+                            
+                            // Handle null values
+                            if (cellValue === null) {
+                                cellValue = '<em>NULL</em>';
+                            }
+                            
+                            // Handle objects and arrays (convert to string)
+                            if (typeof cellValue === 'object') {
+                                cellValue = JSON.stringify(cellValue);
+                            }
+                            
+                            row.append(`<td title="${cellValue}">${cellValue}</td>`);
+                        });
+                        tbody.append(row);
+                    }
+                }
+                
+                // Render the first page
+                renderPage(currentPage);
+                table.append(tbody);
+                container.append(table);
+                
+                // Add pagination if needed
+                if (totalPages > 1) {
+                    const pagination = $('<div class="results-pagination"></div>');
+                    
+                    // Previous button
+                    const prevButton = $('<button class="pagination-button" id="prevPage">Previous</button>');
+                    prevButton.prop('disabled', currentPage === 1);
+                    prevButton.on('click', function() {
+                        if (currentPage > 1) {
+                            currentPage--;
+                            renderPage(currentPage);
+                            updatePaginationState();
+                        }
+                    });
+                    
+                    // Next button
+                    const nextButton = $('<button class="pagination-button" id="nextPage">Next</button>');
+                    nextButton.prop('disabled', currentPage === totalPages);
+                    nextButton.on('click', function() {
+                        if (currentPage < totalPages) {
+                            currentPage++;
+                            renderPage(currentPage);
+                            updatePaginationState();
+                        }
+                    });
+                    
+                    // Page info
+                    const pageInfo = $(`<span class="pagination-info">Page ${currentPage} of ${totalPages}</span>`);
+                    
+                    // Update buttons and info when changing pages
+                    function updatePaginationState() {
+                        prevButton.prop('disabled', currentPage === 1);
+                        nextButton.prop('disabled', currentPage === totalPages);
+                        pageInfo.text(`Page ${currentPage} of ${totalPages}`);
+                    }
+                    
+                    pagination.append(prevButton);
+                    pagination.append(pageInfo);
+                    pagination.append(nextButton);
+                    container.append(pagination);
+                }
+                
+                // Add result count
+                container.prepend(`<p><strong>${results.length}</strong> results found</p>`);
+            }
             
             // Load example sample IDs
             $('#loadSampleIds').click(function() {
