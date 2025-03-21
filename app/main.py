@@ -4,11 +4,20 @@ import tempfile
 import os
 import logging
 import shutil
+import json
+import uuid
+import threading
+import re
+from datetime import datetime
 from pathlib import Path
 import pandas as pd
 import duckdb
 from app.config import config
 from planter.database.query_manager import DatabaseManager
+
+# Global storage for pipeline jobs
+# In a production app, this would be in a database
+pipeline_jobs = {}
 
 def create_app(config_name='default'):
     """Creates and configures the Flask app."""
@@ -195,6 +204,117 @@ def create_app(config_name='default'):
         except Exception as e:
             app.logger.error(f"Create refseq error: {str(e)}")
             return jsonify({'status': 'error', 'message': str(e)}), 500
+            
+    @app.route('/run_pipeline', methods=['POST'])
+    def run_pipeline():
+        """Runs the Planter pipeline with the specified samples."""
+        global pipeline_jobs  # Access the global variable
+        
+        try:
+            # Parse JSON data from request
+            data = request.json
+            if not data:
+                return jsonify({'status': 'error', 'message': 'No data provided'}), 400
+                
+            # Extract parameters
+            cores = data.get('cores', 16)
+            outdir = data.get('outdir', 'outputs')
+            s3_bucket = data.get('s3_bucket', 'recombia.planter')
+            
+            # Parse samples
+            samples_json = data.get('samples', '[]')
+            try:
+                # If samples_json is already a list, use it directly
+                if isinstance(samples_json, list):
+                    samples = samples_json
+                else:
+                    # Otherwise, parse it as JSON
+                    samples = json.loads(samples_json)
+            except json.JSONDecodeError:
+                return jsonify({'status': 'error', 'message': 'Invalid samples format'}), 400
+                
+            if not samples:
+                return jsonify({'status': 'error', 'message': 'No samples provided'}), 400
+                
+            # Generate a unique job ID
+            job_id = str(uuid.uuid4())
+            
+            # Create job record
+            pipeline_jobs[job_id] = {
+                'id': job_id,
+                'status': 'pending',
+                'start_time': datetime.now().isoformat(),
+                'cores': cores,
+                'outdir': outdir,
+                's3_bucket': s3_bucket,
+                'samples': samples,
+                'progress': 0,
+                'logs': ['Pipeline job created.'],
+                'process': None
+            }
+            
+            # Start pipeline in a background thread
+            thread = threading.Thread(
+                target=run_pipeline_job,
+                args=(app, job_id, cores, outdir, s3_bucket, samples, pipeline_jobs)
+            )
+            thread.daemon = True
+            thread.start()
+            
+            return jsonify({
+                'status': 'started',
+                'job_id': job_id,
+                'message': 'Pipeline job started'
+            })
+            
+        except Exception as e:
+            app.logger.error(f"Run pipeline error: {str(e)}")
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+            
+    @app.route('/pipeline_status/<job_id>', methods=['GET'])
+    def pipeline_status(job_id):
+        """Gets the status of a running pipeline job."""
+        global pipeline_jobs  # Access the global variable
+        
+        try:
+            if job_id not in pipeline_jobs:
+                return jsonify({'status': 'error', 'message': 'Job not found'}), 404
+                
+            job = pipeline_jobs[job_id]
+            
+            # Check if the process has completed
+            process = job.get('process')
+            if process and job['status'] == 'running':
+                if process.poll() is not None:
+                    # Process has finished
+                    returncode = process.returncode
+                    if returncode == 0:
+                        job['status'] = 'completed'
+                        job['progress'] = 100
+                        job['logs'].append('Pipeline completed successfully.')
+                    else:
+                        job['status'] = 'failed'
+                        stderr = process.stderr.read().decode('utf-8') if process.stderr else ''
+                        job['logs'].append(f'Pipeline failed with return code {returncode}.')
+                        if stderr:
+                            job['logs'].append(f'Error output: {stderr}')
+            
+            # Get the latest logs
+            logs_since_last_check = []
+            if job.get('last_log_index', 0) < len(job['logs']):
+                logs_since_last_check = job['logs'][job.get('last_log_index', 0):]
+                job['last_log_index'] = len(job['logs'])
+            
+            return jsonify({
+                'status': job['status'],
+                'progress': job['progress'],
+                'message': job.get('message', ''),
+                'logs': logs_since_last_check
+            })
+            
+        except Exception as e:
+            app.logger.error(f"Pipeline status error: {str(e)}")
+            return jsonify({'status': 'error', 'message': str(e)}), 500
 
     def get_sequence_details(seqhash_ids):
         """Fetch annotations and expression for the given seqhash_ids from the database.
@@ -379,6 +499,89 @@ def merge_results_with_metadata(parsed_results, annotations, cluster_info):
     }, inplace=True)
 
     return merged_df.to_dict(orient='records')  # Convert back to list of dictionaries
+
+def run_pipeline_job(app, job_id, cores, outdir, s3_bucket, samples, jobs_dict):
+    """Background function to run the Snakemake pipeline as a subprocess."""
+    with app.app_context():
+        try:
+            # Update job status
+            job = jobs_dict[job_id]
+            job['status'] = 'running'
+            job['progress'] = 5
+            job['logs'].append(f"Starting pipeline with {len(samples)} samples...")
+            
+            # Format the samples list for the command
+            samples_json = json.dumps(samples)
+            
+            # Create the command to run
+            cmd = [
+                'docker-compose', 'run', '--rm', 'planter', 
+                'snakemake', '--snakefile', 'planter/workflow/Snakefile',
+                '--cores', str(cores),
+                '--config', f"outdir={outdir}", f"s3_bucket={s3_bucket}", f"samples={samples_json}"
+            ]
+            
+            # Log the command being run
+            cmd_str = ' '.join(cmd)
+            app.logger.info(f"Running pipeline command: {cmd_str}")
+            job['logs'].append(f"Executing: {cmd_str}")
+            
+            # Start the process
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                universal_newlines=True,
+                bufsize=1  # Line buffered
+            )
+            
+            # Store the process in the job record
+            job['process'] = process
+            
+            # Read output in real-time to update progress
+            progress_pattern = re.compile(r'(\d+)% complete')
+            
+            # Process stdout
+            for line in iter(process.stdout.readline, ''):
+                line = line.strip()
+                if line:
+                    job['logs'].append(line)
+                    
+                    # Check for progress information
+                    progress_match = progress_pattern.search(line)
+                    if progress_match:
+                        progress = int(progress_match.group(1))
+                        job['progress'] = progress
+                        job['message'] = f"Running: {progress}% complete"
+            
+            # Wait for the process to complete
+            process.wait()
+            
+            # Process any remaining stderr
+            stderr = process.stderr.read()
+            if stderr:
+                for line in stderr.splitlines():
+                    if line.strip():
+                        job['logs'].append(f"ERROR: {line.strip()}")
+            
+            # Update final status
+            if process.returncode == 0:
+                job['status'] = 'completed'
+                job['progress'] = 100
+                job['message'] = "Pipeline completed successfully"
+                job['logs'].append("Pipeline execution completed successfully.")
+            else:
+                job['status'] = 'failed'
+                job['message'] = f"Pipeline failed with exit code {process.returncode}"
+                job['logs'].append(f"Pipeline execution failed with exit code {process.returncode}")
+            
+        except Exception as e:
+            app.logger.error(f"Pipeline job error: {str(e)}")
+            if job_id in jobs_dict:
+                jobs_dict[job_id]['status'] = 'failed'
+                jobs_dict[job_id]['message'] = f"Error: {str(e)}"
+                jobs_dict[job_id]['logs'].append(f"ERROR: {str(e)}")
+
 
 def process_search_request(sequence, fasta_path, duckdb_path):
     """Handles the entire search process and merges MMSeqs2 results with metadata."""

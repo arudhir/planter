@@ -50,6 +50,97 @@
             margin-top: 5px;
             font-size: 12px;
         }
+        /* Tabs styling */
+        .tab {
+            overflow: hidden;
+            border: 1px solid #ccc;
+            background-color: #f1f1f1;
+            border-top-left-radius: 5px;
+            border-top-right-radius: 5px;
+        }
+        .tab button {
+            background-color: inherit;
+            float: left;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            padding: 14px 16px;
+            transition: 0.3s;
+            font-size: 16px;
+            margin-right: 0;
+            border-radius: 0;
+        }
+        .tab button:hover {
+            background-color: #ddd;
+        }
+        .tab button.active {
+            background-color: #fff;
+            border-bottom: 2px solid #4CAF50;
+        }
+        .tabcontent {
+            display: none;
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-top: none;
+            border-bottom-left-radius: 5px;
+            border-bottom-right-radius: 5px;
+            animation: fadeEffect 1s;
+        }
+        @keyframes fadeEffect {
+            from {opacity: 0;}
+            to {opacity: 1;}
+        }
+        /* Pipeline Run tab specific styling */
+        .sample-id-container {
+            margin-bottom: 20px;
+        }
+        .sample-id-container textarea {
+            width: 100%;
+            height: 120px;
+            margin-bottom: 10px;
+            font-family: monospace;
+        }
+        .config-option {
+            margin-bottom: 10px;
+        }
+        .config-option label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .config-option input {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+        }
+        .run-button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .run-button:hover {
+            background-color: #45a049;
+        }
+        .run-button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        .console-output {
+            width: 100%;
+            height: 200px;
+            background-color: #000;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            padding: 10px;
+            overflow-y: auto;
+            margin-top: 15px;
+            border-radius: 4px;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -57,18 +148,72 @@
     <img src="{{ url_for('static', filename='images/recombia-logo.png') }}" alt="Recombia Logo" />
 
     <!-- heading -->
-    <h1>MMSeqs2 Search</h1>
+    <h1>Planter Genomic Pipeline</h1>
 
-    <!-- form -->
-    <form method="POST">
-        <textarea name="sequence" id="sequenceInput" placeholder="Enter your protein sequence here"></textarea>
-        <br>
-        <button type="submit">Search</button>
-        <button type="button" id="loadExample">Load Example</button>
-    </form>
+    <!-- Tab navigation -->
+    <div class="tab">
+        <button class="tablinks active" onclick="openTab(event, 'SearchTab')">MMSeqs2 Search</button>
+        <button class="tablinks" onclick="openTab(event, 'PipelineTab')">Run Pipeline</button>
+        <button class="tablinks" onclick="openTab(event, 'DatabaseTab')">Database Management</button>
+    </div>
+
+    <!-- MMSeqs2 Search Tab -->
+    <div id="SearchTab" class="tabcontent" style="display: block;">
+        <h2>MMSeqs2 Search</h2>
+        <form method="POST">
+            <textarea name="sequence" id="sequenceInput" placeholder="Enter your protein sequence here"></textarea>
+            <br>
+            <button type="submit">Search</button>
+            <button type="button" id="loadExample">Load Example</button>
+        </form>
+    </div>
     
-    <!-- Database Management Section -->
-    <div class="admin-panel">
+    <!-- Run Pipeline Tab -->
+    <div id="PipelineTab" class="tabcontent">
+        <h2>Run Planter Pipeline</h2>
+        <p>Enter sample IDs (one per line) to process through the Planter pipeline:</p>
+        
+        <div class="sample-id-container">
+            <textarea id="sampleIds" placeholder="Enter sample IDs here (e.g., ERR13770160, SRR12068547, etc.)
+One sample per line"></textarea>
+            <button type="button" id="loadSampleIds" class="btn btn-sm">Load Example IDs</button>
+        </div>
+        
+        <div class="config-options">
+            <div class="config-option">
+                <label for="cores">CPU Cores:</label>
+                <input type="number" id="cores" value="16" min="1" max="128">
+            </div>
+            
+            <div class="config-option">
+                <label for="outdir">Output Directory:</label>
+                <input type="text" id="outdir" value="outputs">
+            </div>
+            
+            <div class="config-option">
+                <label for="s3Bucket">S3 Bucket:</label>
+                <input type="text" id="s3Bucket" value="recombia.planter">
+            </div>
+        </div>
+        
+        <button type="button" id="runPipeline" class="run-button">Run Pipeline</button>
+        
+        <div id="pipelineStatus" class="status"></div>
+        
+        <!-- Progress bar for pipeline -->
+        <div id="pipelineProgressContainer" class="progress-container">
+            <div class="progress">
+                <div id="pipelineProgressBar" class="progress-bar" role="progressbar">0%</div>
+            </div>
+            <div id="pipelineProgressText" class="progress-text">Preparing pipeline...</div>
+        </div>
+        
+        <!-- Console output -->
+        <div id="consoleOutput" class="console-output"></div>
+    </div>
+    
+    <!-- Database Management Tab -->
+    <div id="DatabaseTab" class="tabcontent">
         <h2>Database Management</h2>
         <p>Use these tools to manage the reference database and FASTA file:</p>
         
@@ -87,6 +232,27 @@
     </div>
 
     <script>
+        // Tab switching function
+        function openTab(evt, tabName) {
+            var i, tabcontent, tablinks;
+            
+            // Hide all tab content
+            tabcontent = document.getElementsByClassName("tabcontent");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].style.display = "none";
+            }
+            
+            // Remove "active" class from all tab buttons
+            tablinks = document.getElementsByClassName("tablinks");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            
+            // Show the current tab and add "active" class to the button
+            document.getElementById(tabName).style.display = "block";
+            evt.currentTarget.className += " active";
+        }
+
         $(document).ready(function() {
             // Load example sequence
             $('#loadExample').click(function() {
@@ -100,6 +266,174 @@
                     alert('Error: Failed to load example sequence');
                 });
             });
+            
+            // Load example sample IDs
+            $('#loadSampleIds').click(function() {
+                const exampleIds = "ERR13770160\nSRR12068547\nSRR12068548\nSRR12068549\nSRR12068550\nSRR12068551";
+                $('#sampleIds').val(exampleIds);
+            });
+            
+            // Run pipeline button handler
+            $('#runPipeline').click(function() {
+                const btn = $(this);
+                const originalText = btn.text();
+                
+                // Get sample IDs and other configuration parameters
+                const sampleIds = $('#sampleIds').val().trim();
+                if (!sampleIds) {
+                    alert('Please enter at least one sample ID');
+                    return;
+                }
+                
+                // Parse sample IDs (split by newlines)
+                const samples = sampleIds.split(/\n/).map(s => s.trim()).filter(s => s);
+                if (samples.length === 0) {
+                    alert('No valid sample IDs found');
+                    return;
+                }
+                
+                // Get other configuration options
+                const cores = $('#cores').val() || 16;
+                const outdir = $('#outdir').val() || 'outputs';
+                const s3Bucket = $('#s3Bucket').val() || 'recombia.planter';
+                
+                // Disable button and show progress
+                btn.text('Starting pipeline...').prop('disabled', true);
+                $('#pipelineStatus').removeClass('success error').hide();
+                $('#pipelineProgressContainer').show();
+                $('#pipelineProgressBar').css('width', '0%').text('0%');
+                $('#pipelineProgressText').text('Preparing to run pipeline...');
+                $('#consoleOutput').show().text('> Initializing pipeline...\n');
+                
+                // Format sample list for command
+                const sampleList = JSON.stringify(samples);
+                
+                // Submit to the run_pipeline endpoint
+                $.ajax({
+                    url: '/run_pipeline',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        cores: cores,
+                        outdir: outdir,
+                        s3_bucket: s3Bucket,
+                        samples: sampleList
+                    }),
+                    success: function(response) {
+                        // Show job started message
+                        appendToConsole('> Pipeline job started with ID: ' + response.job_id);
+                        appendToConsole('> Monitoring job status...');
+                        
+                        // Start polling for job status
+                        monitorPipelineJob(response.job_id, btn, originalText);
+                    },
+                    error: function(xhr) {
+                        let errorMessage = 'Failed to start pipeline';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMessage = xhr.responseJSON.message;
+                        }
+                        $('#pipelineProgressContainer').hide();
+                        $('#pipelineStatus')
+                            .addClass('error')
+                            .text(errorMessage)
+                            .show();
+                        btn.text(originalText).prop('disabled', false);
+                        appendToConsole('> ERROR: ' + errorMessage);
+                    }
+                });
+            });
+            
+            // Function to monitor pipeline job status
+            function monitorPipelineJob(jobId, button, originalButtonText) {
+                let pollInterval = setInterval(function() {
+                    $.ajax({
+                        url: '/pipeline_status/' + jobId,
+                        type: 'GET',
+                        success: function(response) {
+                            // Update progress based on status
+                            if (response.status === 'running') {
+                                // Update progress
+                                const progress = response.progress || 0;
+                                $('#pipelineProgressBar').css('width', progress + '%').text(progress + '%');
+                                $('#pipelineProgressText').text(response.message || 'Running...');
+                                
+                                // Append new logs if any
+                                if (response.logs && response.logs.length > 0) {
+                                    appendToConsole(response.logs.join('\n'));
+                                }
+                            } 
+                            else if (response.status === 'completed') {
+                                // Pipeline finished successfully
+                                clearInterval(pollInterval);
+                                $('#pipelineProgressBar').css('width', '100%').text('100%');
+                                $('#pipelineProgressText').text('Pipeline completed successfully!');
+                                
+                                // Show any final logs
+                                if (response.logs && response.logs.length > 0) {
+                                    appendToConsole(response.logs.join('\n'));
+                                }
+                                
+                                appendToConsole('> Pipeline completed successfully!');
+                                
+                                // Show success message
+                                $('#pipelineStatus')
+                                    .addClass('success')
+                                    .text('Pipeline completed successfully!')
+                                    .show();
+                                
+                                // Reset button
+                                button.text(originalButtonText).prop('disabled', false);
+                            }
+                            else if (response.status === 'failed') {
+                                // Pipeline failed
+                                clearInterval(pollInterval);
+                                $('#pipelineProgressContainer').hide();
+                                
+                                // Show any error logs
+                                if (response.logs && response.logs.length > 0) {
+                                    appendToConsole(response.logs.join('\n'));
+                                }
+                                
+                                appendToConsole('> ERROR: Pipeline failed: ' + (response.message || 'Unknown error'));
+                                
+                                // Show error message
+                                $('#pipelineStatus')
+                                    .addClass('error')
+                                    .text('Pipeline failed: ' + (response.message || 'Unknown error'))
+                                    .show();
+                                
+                                // Reset button
+                                button.text(originalButtonText).prop('disabled', false);
+                            }
+                        },
+                        error: function(xhr) {
+                            // Error checking job status
+                            clearInterval(pollInterval);
+                            let errorMessage = 'Failed to check job status';
+                            if (xhr.responseJSON && xhr.responseJSON.message) {
+                                errorMessage = xhr.responseJSON.message;
+                            }
+                            
+                            appendToConsole('> ERROR: ' + errorMessage);
+                            
+                            $('#pipelineStatus')
+                                .addClass('error')
+                                .text(errorMessage)
+                                .show();
+                            
+                            button.text(originalButtonText).prop('disabled', false);
+                        }
+                    });
+                }, 2000); // Poll every 2 seconds
+            }
+            
+            // Helper function to append text to console output
+            function appendToConsole(text) {
+                const console = $('#consoleOutput');
+                console.append(text + '\n');
+                // Auto-scroll to bottom
+                console.scrollTop(console[0].scrollHeight);
+            }
             
             // Download database from S3
             $('#downloadDatabase').click(function() {
