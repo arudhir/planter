@@ -11,6 +11,20 @@
         textarea { width: 100%; height: 200px; margin-bottom: 10px; }
         button { padding: 10px 20px; margin-right: 10px; }
         img { max-width: 200px; margin-bottom: 20px; } /* optional styling for the logo */
+        .admin-panel { 
+            margin-top: 30px; 
+            padding: 15px; 
+            border: 1px solid #ddd; 
+            border-radius: 5px; 
+        }
+        .status { 
+            margin-top: 10px; 
+            padding: 10px; 
+            border-radius: 4px; 
+            display: none; 
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
     </style>
 </head>
 <body>
@@ -27,9 +41,21 @@
         <button type="submit">Search</button>
         <button type="button" id="loadExample">Load Example</button>
     </form>
+    
+    <!-- Database Management Section -->
+    <div class="admin-panel">
+        <h2>Database Management</h2>
+        <p>Use these tools to manage the reference database and FASTA file:</p>
+        
+        <button type="button" id="downloadDatabase">Download Database</button>
+        <button type="button" id="createRefSeq">Create Reference FASTA</button>
+        
+        <div id="dbStatus" class="status"></div>
+    </div>
 
     <script>
         $(document).ready(function() {
+            // Load example sequence
             $('#loadExample').click(function() {
                 $.get('/load_example', function(data) {
                     if (data.sequence) {
@@ -39,6 +65,72 @@
                     }
                 }).fail(function() {
                     alert('Error: Failed to load example sequence');
+                });
+            });
+            
+            // Download database from S3
+            $('#downloadDatabase').click(function() {
+                const btn = $(this);
+                const originalText = btn.text();
+                
+                btn.text('Downloading...').prop('disabled', true);
+                $('#dbStatus').removeClass('success error').hide();
+                
+                $.ajax({
+                    url: '/download_database',
+                    type: 'POST',
+                    success: function(response) {
+                        $('#dbStatus')
+                            .addClass('success')
+                            .text(response.message)
+                            .show();
+                    },
+                    error: function(xhr) {
+                        let errorMessage = 'Download failed';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMessage = xhr.responseJSON.message;
+                        }
+                        $('#dbStatus')
+                            .addClass('error')
+                            .text(errorMessage)
+                            .show();
+                    },
+                    complete: function() {
+                        btn.text(originalText).prop('disabled', false);
+                    }
+                });
+            });
+            
+            // Create reference FASTA file
+            $('#createRefSeq').click(function() {
+                const btn = $(this);
+                const originalText = btn.text();
+                
+                btn.text('Creating...').prop('disabled', true);
+                $('#dbStatus').removeClass('success error').hide();
+                
+                $.ajax({
+                    url: '/create_refseq',
+                    type: 'POST',
+                    success: function(response) {
+                        $('#dbStatus')
+                            .addClass('success')
+                            .text(response.message + ` (${response.count} sequences)`)
+                            .show();
+                    },
+                    error: function(xhr) {
+                        let errorMessage = 'Failed to create reference FASTA';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMessage = xhr.responseJSON.message;
+                        }
+                        $('#dbStatus')
+                            .addClass('error')
+                            .text(errorMessage)
+                            .show();
+                    },
+                    complete: function() {
+                        btn.text(originalText).prop('disabled', false);
+                    }
                 });
             });
         });

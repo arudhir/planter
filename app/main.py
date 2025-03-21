@@ -1,8 +1,9 @@
-from flask import Flask, render_template, request, jsonify, current_app
+from flask import Flask, render_template, request, jsonify, current_app, redirect, url_for, flash
 import subprocess
 import tempfile
 import os
 import logging
+import shutil
 from pathlib import Path
 import pandas as pd
 import duckdb
@@ -13,6 +14,7 @@ def create_app(config_name='default'):
     """Creates and configures the Flask app."""
     app = Flask(__name__)
     app.config.from_object(config[config_name])
+    app.secret_key = os.environ.get('SECRET_KEY', 'dev-key-for-session-flashes')
     logging.basicConfig(level=logging.DEBUG)
 
     @app.route('/', methods=['GET', 'POST'])
@@ -35,6 +37,88 @@ def create_app(config_name='default'):
         except Exception as e:
             app.logger.error(f"Error loading example: {str(e)}")
             return jsonify({'error': 'Failed to load example sequence'}), 500
+            
+    @app.route('/download_database', methods=['POST'])
+    def download_database():
+        """Downloads the master.duckdb file from S3."""
+        try:
+            s3_path = f"s3://{app.config['S3_BUCKET']}/{app.config['S3_DB_KEY']}"
+            output_path = app.config['DUCKDB_PATH']
+            
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            
+            # Run AWS CLI command to download the file
+            cmd = ['aws', 's3', 'cp', s3_path, output_path]
+            app.logger.info(f"Running command: {' '.join(cmd)}")
+            
+            process = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if process.returncode != 0:
+                app.logger.error(f"AWS S3 download error: {process.stderr}")
+                error_msg = process.stderr.strip() or "Unknown error during database download"
+                return jsonify({'status': 'error', 'message': error_msg}), 500
+            
+            return jsonify({
+                'status': 'success', 
+                'message': f"Database downloaded to {output_path}",
+                'path': output_path
+            })
+            
+        except Exception as e:
+            app.logger.error(f"Download database error: {str(e)}")
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+    
+    @app.route('/create_refseq', methods=['POST'])
+    def create_refseq():
+        """Creates the reference FASTA file from the DuckDB database."""
+        try:
+            db_path = app.config['DUCKDB_PATH']
+            output_path = app.config['REPSEQ_FASTA']
+            
+            # Verify database file exists
+            if not os.path.exists(db_path):
+                return jsonify({
+                    'status': 'error',
+                    'message': f"Database file not found at {db_path}. Please download it first."
+                }), 404
+            
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            
+            # Connect to DuckDB and extract representative sequences
+            try:
+                app.logger.info(f"Extracting representative sequences from {db_path} to {output_path}")
+                with duckdb.connect(db_path) as conn:
+                    query = """
+                    SELECT
+                       '>' || seqhash_id || chr(10) || sequence
+                    FROM
+                        sequences
+                    WHERE
+                        is_representative = TRUE;
+                    """
+                    result = conn.execute(query).fetchall()
+                
+                # Write the results to the output file
+                with open(output_path, 'w') as f:
+                    for row in result:
+                        f.write(row[0] + '\n')
+                
+                return jsonify({
+                    'status': 'success',
+                    'message': f"Reference FASTA file created at {output_path}",
+                    'path': output_path,
+                    'count': len(result)
+                })
+                
+            except Exception as e:
+                app.logger.error(f"DuckDB query error: {str(e)}")
+                return jsonify({'status': 'error', 'message': f"Database query error: {str(e)}"}), 500
+            
+        except Exception as e:
+            app.logger.error(f"Create refseq error: {str(e)}")
+            return jsonify({'status': 'error', 'message': str(e)}), 500
 
     def get_sequence_details(seqhash_ids):
         """Fetch annotations and expression for the given seqhash_ids from the database.
