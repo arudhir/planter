@@ -108,10 +108,16 @@
             margin-bottom: 5px;
             font-weight: bold;
         }
-        .config-option input {
+        .config-option input:not([type="checkbox"]) {
             width: 100%;
             padding: 8px;
             box-sizing: border-box;
+        }
+        .checkbox-option {
+            margin-top: 15px;
+        }
+        .checkbox-option input {
+            margin-right: 8px;
         }
         .run-button {
             background-color: #4CAF50;
@@ -317,6 +323,18 @@ One sample per line"></textarea>
             <div class="config-option">
                 <label for="s3Bucket">S3 Bucket:</label>
                 <input type="text" id="s3Bucket" value="recombia.planter">
+            </div>
+            
+            <div class="config-option checkbox-option">
+                <label>
+                    <input type="checkbox" id="dryRun"> Dry Run (simulate pipeline execution without running tasks)
+                </label>
+            </div>
+            
+            <div class="config-option checkbox-option">
+                <label>
+                    <input type="checkbox" id="runBackground"> Run in Background (submit job and run in background)
+                </label>
             </div>
         </div>
         
@@ -710,14 +728,26 @@ One sample per line"></textarea>
                 const cores = $('#cores').val() || 16;
                 const outdir = $('#outdir').val() || 'outputs';
                 const s3Bucket = $('#s3Bucket').val() || 'recombia.planter';
+                const dryRun = $('#dryRun').is(':checked');
+                const runBackground = $('#runBackground').is(':checked');
                 
                 // Disable button and show progress
-                btn.text('Starting pipeline...').prop('disabled', true);
+                let btnText = 'Starting pipeline';
+                if (dryRun) btnText += ' (dry run)';
+                if (runBackground) btnText += ' in background';
+                btn.text(btnText + '...').prop('disabled', true);
+                
                 $('#pipelineStatus').removeClass('success error').hide();
                 $('#pipelineProgressContainer').show();
                 $('#pipelineProgressBar').css('width', '0%').text('0%');
                 $('#pipelineProgressText').text('Preparing to run pipeline...');
                 $('#consoleOutput').show().text('> Initializing pipeline...\n');
+                if (dryRun) {
+                    appendToConsole('> Dry run mode: pipeline tasks will be simulated but not executed');
+                }
+                if (runBackground) {
+                    appendToConsole('> Background mode: pipeline will run in the background');
+                }
                 
                 // Format sample list for command
                 const sampleList = JSON.stringify(samples);
@@ -731,7 +761,9 @@ One sample per line"></textarea>
                         cores: cores,
                         outdir: outdir,
                         s3_bucket: s3Bucket,
-                        samples: sampleList
+                        samples: sampleList,
+                        dry_run: dryRun,
+                        background: runBackground
                     }),
                     success: function(response) {
                         // Show job started message
@@ -860,6 +892,13 @@ One sample per line"></textarea>
                 $('#progressBar').css('width', '0%').text('0%');
                 $('#progressText').text('Preparing download...');
                 
+                // Clearly indicate we're starting the download
+                $('#dbStatus')
+                    .removeClass('success error')
+                    .addClass('success')
+                    .text('Starting database download...')
+                    .show();
+                
                 // Start the download
                 $.ajax({
                     url: '/download_database',
@@ -869,6 +908,11 @@ One sample per line"></textarea>
                             // Show progress bar and start polling for progress
                             const s3Path = response.s3_path;
                             const outputPath = response.output_path;
+                            
+                            // Update status to show download is underway
+                            $('#dbStatus')
+                                .text('Download started. Beginning progress tracking...')
+                                .show();
                             
                             // Start monitoring the progress
                             monitorDownloadProgress(s3Path, outputPath, btn, originalText);

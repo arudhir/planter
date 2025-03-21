@@ -61,6 +61,17 @@ def create_app(config_name='default'):
             cmd = ['aws', 's3', 'cp', s3_path, output_path, '--no-progress']
             app.logger.info(f"Running command: {' '.join(cmd)}")
             
+            # Actually start the download process
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+            
+            # Log that we've started the download
+            app.logger.info(f"Started download process with PID: {process.pid}")
+            
             return jsonify({
                 'status': 'started', 
                 'message': f"Download started from {s3_path}",
@@ -346,6 +357,8 @@ def create_app(config_name='default'):
             cores = data.get('cores', 16)
             outdir = data.get('outdir', 'outputs')
             s3_bucket = data.get('s3_bucket', 'recombia.planter')
+            dry_run = data.get('dry_run', False)
+            background = data.get('background', False)
             
             # Parse samples
             samples_json = data.get('samples', '[]')
@@ -376,21 +389,30 @@ def create_app(config_name='default'):
                 'samples': samples,
                 'progress': 0,
                 'logs': ['Pipeline job created.'],
-                'process': None
+                'process': None,
+                'dry_run': dry_run,
+                'background': background
             }
             
-            # Start pipeline in a background thread
+            # Start pipeline in a background thread if requested
             thread = threading.Thread(
                 target=run_pipeline_job,
-                args=(app, job_id, cores, outdir, s3_bucket, samples, pipeline_jobs)
+                args=(app, job_id, cores, outdir, s3_bucket, samples, pipeline_jobs, dry_run)
             )
             thread.daemon = True
             thread.start()
             
+            message = 'Pipeline job started'
+            if dry_run:
+                message += ' (dry run)'
+            if background:
+                message += ' in background'
+            
             return jsonify({
                 'status': 'started',
                 'job_id': job_id,
-                'message': 'Pipeline job started'
+                'message': message,
+                'background': background
             })
             
         except Exception as e:
@@ -411,19 +433,62 @@ def create_app(config_name='default'):
             # Check if the process has completed
             process = job.get('process')
             if process and job['status'] == 'running':
+                # For background jobs, capture and process output when status is checked
+                if job.get('background', False):
+                    # Check if we need to process output
+                    if not job.get('output_processed', False):
+                        # Read any available stdout
+                        progress_pattern = re.compile(r'(\d+)% complete')
+                        
+                        # Non-blocking read from stdout
+                        while process.stdout.readable():
+                            line = process.stdout.readline()
+                            if not line:
+                                break
+                                
+                            line = line.strip()
+                            if line:
+                                job['logs'].append(line)
+                                
+                                # Check for progress information
+                                progress_match = progress_pattern.search(line)
+                                if progress_match:
+                                    progress = int(progress_match.group(1))
+                                    job['progress'] = progress
+                                    job['message'] = f"Running: {progress}% complete"
+                
+                # Check if process has completed
                 if process.poll() is not None:
                     # Process has finished
                     returncode = process.returncode
+                    
+                    # Process any remaining output 
+                    if process.stdout:
+                        for line in process.stdout.readlines():
+                            if line.strip():
+                                job['logs'].append(line.strip())
+                    
+                    # Process any stderr
+                    if process.stderr:
+                        stderr = process.stderr.read().decode('utf-8') if process.stderr else ''
+                        if stderr:
+                            for line in stderr.splitlines():
+                                if line.strip():
+                                    job['logs'].append(f"ERROR: {line.strip()}")
+                    
                     if returncode == 0:
                         job['status'] = 'completed'
                         job['progress'] = 100
+                        job['message'] = "Pipeline completed successfully"
+                        if job.get('dry_run', False):
+                            job['message'] += " (dry run)"
                         job['logs'].append('Pipeline completed successfully.')
                     else:
                         job['status'] = 'failed'
-                        stderr = process.stderr.read().decode('utf-8') if process.stderr else ''
                         job['logs'].append(f'Pipeline failed with return code {returncode}.')
-                        if stderr:
-                            job['logs'].append(f'Error output: {stderr}')
+                    
+                    # Mark output as fully processed
+                    job['output_processed'] = True
             
             # Get the latest logs
             logs_since_last_check = []
@@ -435,7 +500,9 @@ def create_app(config_name='default'):
                 'status': job['status'],
                 'progress': job['progress'],
                 'message': job.get('message', ''),
-                'logs': logs_since_last_check
+                'logs': logs_since_last_check,
+                'background': job.get('background', False),
+                'dry_run': job.get('dry_run', False)
             })
             
         except Exception as e:
@@ -626,7 +693,7 @@ def merge_results_with_metadata(parsed_results, annotations, cluster_info):
 
     return merged_df.to_dict(orient='records')  # Convert back to list of dictionaries
 
-def run_pipeline_job(app, job_id, cores, outdir, s3_bucket, samples, jobs_dict):
+def run_pipeline_job(app, job_id, cores, outdir, s3_bucket, samples, jobs_dict, dry_run=False):
     """Background function to run the Snakemake pipeline as a subprocess."""
     with app.app_context():
         try:
@@ -644,8 +711,18 @@ def run_pipeline_job(app, job_id, cores, outdir, s3_bucket, samples, jobs_dict):
                 'docker-compose', 'run', '--rm', 'planter', 
                 'snakemake', '--snakefile', 'planter/workflow/Snakefile',
                 '--cores', str(cores),
-                '--config', f"outdir={outdir}", f"s3_bucket={s3_bucket}", f"samples={samples_json}"
+                '--rerun-incomplete'
             ]
+            
+            # Add dry run flag if requested
+            if dry_run:
+                cmd.append('--dry-run')
+                job['logs'].append("Running in dry-run mode (will not execute tasks)")
+            
+            # Add config parameters
+            cmd.extend([
+                '--config', f"outdir={outdir}", f"s3_bucket={s3_bucket}", f"samples={samples_json}"
+            ])
             
             # Log the command being run
             cmd_str = ' '.join(cmd)
@@ -664,6 +741,15 @@ def run_pipeline_job(app, job_id, cores, outdir, s3_bucket, samples, jobs_dict):
             # Store the process in the job record
             job['process'] = process
             
+            # Set up process handling based on background mode
+            if job.get('background', False):
+                # For background jobs, don't capture output immediately
+                # We'll read it when the user checks the status
+                job['logs'].append("Running in background mode")
+                job['message'] = "Pipeline running in background"
+                return
+            
+            # For foreground jobs, process output in real-time
             # Read output in real-time to update progress
             progress_pattern = re.compile(r'(\d+)% complete')
             
@@ -695,6 +781,8 @@ def run_pipeline_job(app, job_id, cores, outdir, s3_bucket, samples, jobs_dict):
                 job['status'] = 'completed'
                 job['progress'] = 100
                 job['message'] = "Pipeline completed successfully"
+                if dry_run:
+                    job['message'] += " (dry run)"
                 job['logs'].append("Pipeline execution completed successfully.")
             else:
                 job['status'] = 'failed'
