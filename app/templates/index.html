@@ -379,18 +379,17 @@ One sample per line"></textarea>
                     </select>
                 </div>
                 
-                <!-- Input fields for special queries -->
-                <div id="searchInputContainer" class="search-input-container" style="display:none;">
-                    <div id="sampleSearchInput" class="search-control" style="display:none;">
-                        <label for="sampleIds">Sample IDs (comma-separated):</label>
-                        <input type="text" id="sampleIds" class="special-input" placeholder="e.g., SRR12068547, SRR12068548">
-                        <button type="button" id="insertSampleIds" class="btn btn-sm">Insert to Query</button>
-                    </div>
-                    
-                    <div id="seqhashSearchInput" class="search-control" style="display:none;">
-                        <label for="seqhashIds">Seqhash IDs (comma-separated):</label>
-                        <input type="text" id="seqhashIds" class="special-input" placeholder="e.g., hash123, hash456">
-                        <button type="button" id="insertSeqhashIds" class="btn btn-sm">Insert to Query</button>
+                <!-- Note about modifying special queries -->
+                <div id="searchHelpText" class="search-input-container" style="display:none;">
+                    <div class="search-help">
+                        <p><strong>Instructions:</strong></p>
+                        <p>This query has example values in it. You can modify the query directly in the text area below by:</p>
+                        <ul>
+                            <li>Replacing the example IDs with your own (inside the single quotes)</li>
+                            <li>Adding or removing columns as needed</li>
+                            <li>Adjusting WHERE clauses as needed</li>
+                        </ul>
+                        <p>Click "Run Query" when you're ready to execute it.</p>
                     </div>
                 </div>
                 
@@ -482,25 +481,11 @@ One sample per line"></textarea>
                                 $('#queryProgressContainer').hide();
                                 
                                 // Show appropriate input fields for special queries
-                                if (selectedQuery === 'search_samples_by_id') {
-                                    // Verify placeholder exists
-                                    if (response.query.indexOf('\'PLACEHOLDER_VALUE\'') !== -1) {
-                                        $('#searchInputContainer').show();
-                                        $('#sampleSearchInput').show();
-                                    } else {
-                                        console.error("Sample IDs placeholder not found in query:", response.query);
-                                        alert("The query template doesn't contain the expected placeholder. Please contact the administrator.");
-                                    }
-                                }
-                                else if (selectedQuery === 'search_sequence_by_seqhash') {
-                                    // Verify placeholder exists
-                                    if (response.query.indexOf('\'PLACEHOLDER_VALUE\'') !== -1) {
-                                        $('#searchInputContainer').show();
-                                        $('#seqhashSearchInput').show();
-                                    } else {
-                                        console.error("Seqhash IDs placeholder not found in query:", response.query);
-                                        alert("The query template doesn't contain the expected placeholder. Please contact the administrator.");
-                                    }
+                                // Show help text for special queries that require modification
+                                if (selectedQuery === 'search_samples_by_id' || selectedQuery === 'search_sequence_by_seqhash') {
+                                    $('#searchHelpText').show();
+                                } else {
+                                    $('#searchHelpText').hide();
                                 }
                             } else {
                                 $('#queryStatus')
@@ -524,93 +509,8 @@ One sample per line"></textarea>
                 }
             });
             
-            // Handler for sample ID insertion
-            $('#insertSampleIds').click(function() {
-                let sampleIds = $('#sampleIds').val().trim();
-                console.log("Sample IDs input:", sampleIds);
-                
-                if (!sampleIds) {
-                    alert('Please enter at least one sample ID');
-                    return;
-                }
-                
-                // Parse and format the sample IDs
-                const ids = sampleIds.split(',').map(id => id.trim()).filter(id => id);
-                console.log("Parsed IDs:", ids);
-                
-                if (ids.length === 0) {
-                    alert('No valid sample IDs found');
-                    return;
-                }
-                
-                // Format the IDs as SQL string literals
-                const formattedIds = ids.map(id => `'${id}'`).join(', ');
-                console.log("Formatted IDs:", formattedIds);
-                
-                // Replace the placeholder in the SQL
-                let sql = $('#sqlQuery').val();
-                const originalSql = sql;
-                sql = sql.replace('\'PLACEHOLDER_VALUE\'', formattedIds);
-                console.log("SQL before:", originalSql);
-                console.log("SQL after:", sql);
-                
-                // Check if replacement actually happened
-                if (sql === originalSql) {
-                    alert('Could not find \'PLACEHOLDER_VALUE\' in the query. Please ensure the query contains this placeholder.');
-                    return;
-                }
-                
-                $('#sqlQuery').val(sql);
-                
-                // Visual feedback
-                $('#sampleSearchInput').css('background-color', '#d4edda').delay(500).queue(function() {
-                    $(this).css('background-color', '').dequeue();
-                });
-            });
-            
-            // Handler for seqhash ID insertion
-            $('#insertSeqhashIds').click(function() {
-                let seqhashIds = $('#seqhashIds').val().trim();
-                console.log("Seqhash IDs input:", seqhashIds);
-                
-                if (!seqhashIds) {
-                    alert('Please enter at least one seqhash ID');
-                    return;
-                }
-                
-                // Parse and format the seqhash IDs
-                const ids = seqhashIds.split(',').map(id => id.trim()).filter(id => id);
-                console.log("Parsed IDs:", ids);
-                
-                if (ids.length === 0) {
-                    alert('No valid seqhash IDs found');
-                    return;
-                }
-                
-                // Format the IDs as SQL string literals
-                const formattedIds = ids.map(id => `'${id}'`).join(', ');
-                console.log("Formatted IDs:", formattedIds);
-                
-                // Replace the placeholder in the SQL
-                let sql = $('#sqlQuery').val();
-                const originalSql = sql;
-                sql = sql.replace('\'PLACEHOLDER_VALUE\'', formattedIds);
-                console.log("SQL before:", originalSql);
-                console.log("SQL after:", sql);
-                
-                // Check if replacement actually happened
-                if (sql === originalSql) {
-                    alert('Could not find \'PLACEHOLDER_VALUE\' in the query. Please ensure the query contains this placeholder.');
-                    return;
-                }
-                
-                $('#sqlQuery').val(sql);
-                
-                // Visual feedback
-                $('#seqhashSearchInput').css('background-color', '#d4edda').delay(500).queue(function() {
-                    $(this).css('background-color', '').dequeue();
-                });
-            });
+            // We've removed the special input handlers for simplicity
+            // Users will now directly edit the SQL query with their IDs
             
             // Run SQL query
             $('#runQuery').click(function() {

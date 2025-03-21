@@ -1,6 +1,6 @@
 -- Search samples by ID
 -- Returns metadata for samples matching the provided ID(s)
--- The 'PLACEHOLDER_VALUE' will be replaced with the actual list of IDs
+-- Example usage: Replace 'SRR12068547', 'SRR12068548' with your own sample IDs
 
 SELECT 
     m.sample_id,
@@ -23,7 +23,7 @@ SELECT
 FROM sra_metadata m
 LEFT JOIN sequences s ON m.sample_id = s.sample_id
 LEFT JOIN annotations a ON s.seqhash_id = a.seqhash_id
-WHERE m.sample_id IN ('PLACEHOLDER_VALUE')
+WHERE m.sample_id IN ('SRR12068547', 'SRR12068548')  -- Replace these with your own sample IDs
 GROUP BY 
     m.sample_id,
     m.organism,

@@ -1,6 +1,6 @@
 -- Search sequence by seqhash ID
 -- Returns comprehensive information about the specified sequence(s)
--- The 'PLACEHOLDER_VALUE' will be replaced with the actual list of IDs
+-- Example usage: Replace the seqhash IDs with your own
 
 WITH seq_info AS (
     SELECT 
@@ -17,7 +17,7 @@ WITH seq_info AS (
     FROM sequences s
     LEFT JOIN annotations a ON s.seqhash_id = a.seqhash_id
     LEFT JOIN sra_metadata sm ON s.sample_id = sm.sample_id
-    WHERE s.seqhash_id IN ('PLACEHOLDER_VALUE')
+    WHERE s.seqhash_id IN ('hash_12345', 'hash_67890')  -- Replace with your seqhash IDs
 ),
 cluster_info AS (
     SELECT 
@@ -27,14 +27,14 @@ cluster_info AS (
         ARRAY_AGG(cm2.seqhash_id) OVER (PARTITION BY cm.cluster_id) AS cluster_members
     FROM cluster_members cm
     JOIN cluster_members cm2 ON cm.cluster_id = cm2.cluster_id
-    WHERE cm.seqhash_id IN ('PLACEHOLDER_VALUE')
+    WHERE cm.seqhash_id IN (SELECT seqhash_id FROM seq_info)
 ),
 go_terms_info AS (
     SELECT 
         g.seqhash_id,
         ARRAY_AGG(g.go_term) AS go_terms
     FROM go_terms g
-    WHERE g.seqhash_id IN ('PLACEHOLDER_VALUE')
+    WHERE g.seqhash_id IN (SELECT seqhash_id FROM seq_info)
     GROUP BY g.seqhash_id
 ),
 ec_numbers_info AS (
@@ -42,7 +42,7 @@ ec_numbers_info AS (
         e.seqhash_id,
         ARRAY_AGG(e.ec_number) AS ec_numbers
     FROM ec_numbers e
-    WHERE e.seqhash_id IN ('PLACEHOLDER_VALUE')
+    WHERE e.seqhash_id IN (SELECT seqhash_id FROM seq_info)
     GROUP BY e.seqhash_id
 ),
 expression_info AS (
@@ -53,7 +53,7 @@ expression_info AS (
         SUM(expr.num_reads) AS total_reads
     FROM gene_protein_map gpm
     JOIN expression expr ON gpm.gene_seqhash_id = expr.gene_seqhash_id
-    WHERE gpm.protein_seqhash_id IN ('PLACEHOLDER_VALUE')
+    WHERE gpm.protein_seqhash_id IN (SELECT seqhash_id FROM seq_info)
     GROUP BY gpm.protein_seqhash_id
 )
 
