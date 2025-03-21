@@ -538,13 +538,13 @@ One sample per line"></textarea>
                 // Replace the placeholder in the SQL
                 let sql = $('#sqlQuery').val();
                 const originalSql = sql;
-                sql = sql.replace('@sample_ids@', formattedIds);
+                sql = sql.replace('%%SAMPLE_IDS%%', formattedIds);
                 console.log("SQL before:", originalSql);
                 console.log("SQL after:", sql);
                 
                 // Check if replacement actually happened
                 if (sql === originalSql) {
-                    alert('Could not find @sample_ids@ placeholder in the query. Please ensure the query contains this placeholder.');
+                    alert('Could not find %%SAMPLE_IDS%% placeholder in the query. Please ensure the query contains this placeholder.');
                     return;
                 }
                 
@@ -582,13 +582,13 @@ One sample per line"></textarea>
                 // Replace the placeholder in the SQL
                 let sql = $('#sqlQuery').val();
                 const originalSql = sql;
-                sql = sql.replace('@seqhash_ids@', formattedIds);
+                sql = sql.replace('%%SEQHASH_IDS%%', formattedIds);
                 console.log("SQL before:", originalSql);
                 console.log("SQL after:", sql);
                 
                 // Check if replacement actually happened
                 if (sql === originalSql) {
-                    alert('Could not find @seqhash_ids@ placeholder in the query. Please ensure the query contains this placeholder.');
+                    alert('Could not find %%SEQHASH_IDS%% placeholder in the query. Please ensure the query contains this placeholder.');
                     return;
                 }
                 
