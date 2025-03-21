@@ -263,9 +263,23 @@ def create_app(config_name='default'):
             app.logger.info(f"Executing query: {query}")
             
             try:
+                # Count number of parameter placeholders (?)
+                param_count = query.count('?')
+                
+                # Replace Jinja2-style parameters like {{ limit }} with actual values
+                if '{{ limit }}' in query:
+                    query = query.replace('{{ limit }}', '100')  # Default limit to 100
+                
+                # Create a list of NULL parameters if there are any placeholders
+                params = [None] * param_count if param_count > 0 else []
+                
                 # Limited to 10 seconds execution time
                 with duckdb.connect(db_path) as conn:
-                    result = conn.execute(query).fetchdf()
+                    if params:
+                        app.logger.info(f"Executing with {len(params)} NULL parameters")
+                        result = conn.execute(query, params).fetchdf()
+                    else:
+                        result = conn.execute(query).fetchdf()
                     
                 # Convert the result to a list of dictionaries
                 results = result.to_dict(orient='records')

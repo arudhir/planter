@@ -6,5 +6,5 @@ FROM go_terms g
 JOIN sequences s ON g.seqhash_id = s.seqhash_id
 WHERE (? IS NULL OR s.sample_id = ?)
 GROUP BY g.go_term
-HAVING COUNT(DISTINCT s.seqhash_id) >= ?
+HAVING COUNT(DISTINCT s.seqhash_id) >= 1
 ORDER BY sequence_count DESC
