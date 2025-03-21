@@ -12,7 +12,7 @@ WITH seq_info AS (
         a.description,
         a.preferred_name,
         a.cog_category,
-        a.eggnog_seed,
+        a.seed_ortholog,
         sm.organism
     FROM sequences s
     LEFT JOIN annotations a ON s.seqhash_id = a.seqhash_id
@@ -67,7 +67,7 @@ SELECT
     s.description,
     s.preferred_name,
     s.cog_category,
-    s.eggnog_seed,
+    s.seed_ortholog,
     c.cluster_id,
     c.cluster_size,
     c.cluster_members,
