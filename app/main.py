@@ -209,21 +209,40 @@ def create_app(config_name='default'):
     def get_preset_query():
         """Gets a preset SQL query template."""
         query_name = request.args.get('query_name')
+        app.logger.debug(f"Requested query template: {query_name}")
+        
         if not query_name:
             return jsonify({'status': 'error', 'message': 'No query name provided'}), 400
             
         # Load the SQL query from the database directory
         try:
             query_file = f"/home/ubuntu/planter/planter/database/queries/sql/{query_name}.sql"
+            app.logger.debug(f"Looking for query file at: {query_file}")
+            
             if not os.path.exists(query_file):
+                app.logger.error(f"Query file not found: {query_file}")
                 return jsonify({'status': 'error', 'message': f"Query '{query_name}' not found"}), 404
                 
             with open(query_file, 'r') as f:
                 query_sql = f.read()
                 
+            # Log placeholder check
+            if query_name == 'search_samples_by_id':
+                if '%%SAMPLE_IDS%%' in query_sql:
+                    app.logger.debug("Found %%SAMPLE_IDS%% placeholder in query template")
+                else:
+                    app.logger.error("%%SAMPLE_IDS%% placeholder NOT found in query template!")
+            
+            if query_name == 'search_sequence_by_seqhash':
+                if '%%SEQHASH_IDS%%' in query_sql:
+                    app.logger.debug("Found %%SEQHASH_IDS%% placeholder in query template")
+                else:
+                    app.logger.error("%%SEQHASH_IDS%% placeholder NOT found in query template!")
+                
             return jsonify({
                 'status': 'success',
-                'query': query_sql
+                'query': query_sql,
+                'file_path': query_file
             })
         except Exception as e:
             app.logger.error(f"Get preset query error: {str(e)}")

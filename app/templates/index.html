@@ -483,12 +483,24 @@ One sample per line"></textarea>
                                 
                                 // Show appropriate input fields for special queries
                                 if (selectedQuery === 'search_samples_by_id') {
-                                    $('#searchInputContainer').show();
-                                    $('#sampleSearchInput').show();
+                                    // Verify placeholder exists
+                                    if (response.query.indexOf('%%SAMPLE_IDS%%') !== -1) {
+                                        $('#searchInputContainer').show();
+                                        $('#sampleSearchInput').show();
+                                    } else {
+                                        console.error("Sample IDs placeholder not found in query:", response.query);
+                                        alert("The query template doesn't contain the expected %%SAMPLE_IDS%% placeholder. Please contact the administrator.");
+                                    }
                                 }
                                 else if (selectedQuery === 'search_sequence_by_seqhash') {
-                                    $('#searchInputContainer').show();
-                                    $('#seqhashSearchInput').show();
+                                    // Verify placeholder exists
+                                    if (response.query.indexOf('%%SEQHASH_IDS%%') !== -1) {
+                                        $('#searchInputContainer').show();
+                                        $('#seqhashSearchInput').show();
+                                    } else {
+                                        console.error("Seqhash IDs placeholder not found in query:", response.query);
+                                        alert("The query template doesn't contain the expected %%SEQHASH_IDS%% placeholder. Please contact the administrator.");
+                                    }
                                 }
                             } else {
                                 $('#queryStatus')
