@@ -515,6 +515,8 @@ One sample per line"></textarea>
             // Handler for sample ID insertion
             $('#insertSampleIds').click(function() {
                 let sampleIds = $('#sampleIds').val().trim();
+                console.log("Sample IDs input:", sampleIds);
+                
                 if (!sampleIds) {
                     alert('Please enter at least one sample ID');
                     return;
@@ -522,6 +524,8 @@ One sample per line"></textarea>
                 
                 // Parse and format the sample IDs
                 const ids = sampleIds.split(',').map(id => id.trim()).filter(id => id);
+                console.log("Parsed IDs:", ids);
+                
                 if (ids.length === 0) {
                     alert('No valid sample IDs found');
                     return;
@@ -529,10 +533,21 @@ One sample per line"></textarea>
                 
                 // Format the IDs as SQL string literals
                 const formattedIds = ids.map(id => `'${id}'`).join(', ');
+                console.log("Formatted IDs:", formattedIds);
                 
                 // Replace the placeholder in the SQL
                 let sql = $('#sqlQuery').val();
+                const originalSql = sql;
                 sql = sql.replace('@sample_ids@', formattedIds);
+                console.log("SQL before:", originalSql);
+                console.log("SQL after:", sql);
+                
+                // Check if replacement actually happened
+                if (sql === originalSql) {
+                    alert('Could not find @sample_ids@ placeholder in the query. Please ensure the query contains this placeholder.');
+                    return;
+                }
+                
                 $('#sqlQuery').val(sql);
                 
                 // Visual feedback
@@ -544,6 +559,8 @@ One sample per line"></textarea>
             // Handler for seqhash ID insertion
             $('#insertSeqhashIds').click(function() {
                 let seqhashIds = $('#seqhashIds').val().trim();
+                console.log("Seqhash IDs input:", seqhashIds);
+                
                 if (!seqhashIds) {
                     alert('Please enter at least one seqhash ID');
                     return;
@@ -551,6 +568,8 @@ One sample per line"></textarea>
                 
                 // Parse and format the seqhash IDs
                 const ids = seqhashIds.split(',').map(id => id.trim()).filter(id => id);
+                console.log("Parsed IDs:", ids);
+                
                 if (ids.length === 0) {
                     alert('No valid seqhash IDs found');
                     return;
@@ -558,10 +577,21 @@ One sample per line"></textarea>
                 
                 // Format the IDs as SQL string literals
                 const formattedIds = ids.map(id => `'${id}'`).join(', ');
+                console.log("Formatted IDs:", formattedIds);
                 
                 // Replace the placeholder in the SQL
                 let sql = $('#sqlQuery').val();
+                const originalSql = sql;
                 sql = sql.replace('@seqhash_ids@', formattedIds);
+                console.log("SQL before:", originalSql);
+                console.log("SQL after:", sql);
+                
+                // Check if replacement actually happened
+                if (sql === originalSql) {
+                    alert('Could not find @seqhash_ids@ placeholder in the query. Please ensure the query contains this placeholder.');
+                    return;
+                }
+                
                 $('#sqlQuery').val(sql);
                 
                 // Visual feedback
