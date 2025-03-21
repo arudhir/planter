@@ -230,6 +230,40 @@
         .pagination-info {
             padding: 5px 10px;
         }
+        /* Search input fields */
+        .search-input-container {
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .search-control {
+            margin-bottom: 8px;
+        }
+        .search-control label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .special-input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn:hover {
+            background-color: #45a049;
+        }
     </style>
 </head>
 <body>
@@ -340,7 +374,24 @@ One sample per line"></textarea>
                         <option value="ec_number_summary">EC Number Summary</option>
                         <option value="cluster_stats">Cluster Statistics</option>
                         <option value="expression_distribution">Expression Distribution</option>
+                        <option value="search_samples_by_id">Search Samples by ID</option>
+                        <option value="search_sequence_by_seqhash">Search Sequence by Seqhash</option>
                     </select>
+                </div>
+                
+                <!-- Input fields for special queries -->
+                <div id="searchInputContainer" class="search-input-container" style="display:none;">
+                    <div id="sampleSearchInput" class="search-control" style="display:none;">
+                        <label for="sampleIds">Sample IDs (comma-separated):</label>
+                        <input type="text" id="sampleIds" class="special-input" placeholder="e.g., SRR12068547, SRR12068548">
+                        <button type="button" id="insertSampleIds" class="btn btn-sm">Insert to Query</button>
+                    </div>
+                    
+                    <div id="seqhashSearchInput" class="search-control" style="display:none;">
+                        <label for="seqhashIds">Seqhash IDs (comma-separated):</label>
+                        <input type="text" id="seqhashIds" class="special-input" placeholder="e.g., hash123, hash456">
+                        <button type="button" id="insertSeqhashIds" class="btn btn-sm">Insert to Query</button>
+                    </div>
                 </div>
                 
                 <textarea id="sqlQuery" placeholder="SELECT * FROM sequences LIMIT 10;"></textarea>
@@ -407,6 +458,12 @@ One sample per line"></textarea>
             // Database Query Tab functionality
             $('#presetQueries').change(function() {
                 const selectedQuery = $(this).val();
+                
+                // Hide all special input containers first
+                $('#searchInputContainer').hide();
+                $('#sampleSearchInput').hide();
+                $('#seqhashSearchInput').hide();
+                
                 if (selectedQuery) {
                     // Show loading state
                     $('#queryStatus').removeClass('success error').hide();
@@ -423,6 +480,16 @@ One sample per line"></textarea>
                             if (response.query) {
                                 $('#sqlQuery').val(response.query);
                                 $('#queryProgressContainer').hide();
+                                
+                                // Show appropriate input fields for special queries
+                                if (selectedQuery === 'search_samples_by_id') {
+                                    $('#searchInputContainer').show();
+                                    $('#sampleSearchInput').show();
+                                }
+                                else if (selectedQuery === 'search_sequence_by_seqhash') {
+                                    $('#searchInputContainer').show();
+                                    $('#seqhashSearchInput').show();
+                                }
                             } else {
                                 $('#queryStatus')
                                     .addClass('error')
@@ -443,6 +510,64 @@ One sample per line"></textarea>
                         }
                     });
                 }
+            });
+            
+            // Handler for sample ID insertion
+            $('#insertSampleIds').click(function() {
+                let sampleIds = $('#sampleIds').val().trim();
+                if (!sampleIds) {
+                    alert('Please enter at least one sample ID');
+                    return;
+                }
+                
+                // Parse and format the sample IDs
+                const ids = sampleIds.split(',').map(id => id.trim()).filter(id => id);
+                if (ids.length === 0) {
+                    alert('No valid sample IDs found');
+                    return;
+                }
+                
+                // Format the IDs as SQL string literals
+                const formattedIds = ids.map(id => `'${id}'`).join(', ');
+                
+                // Replace the placeholder in the SQL
+                let sql = $('#sqlQuery').val();
+                sql = sql.replace('@sample_ids@', formattedIds);
+                $('#sqlQuery').val(sql);
+                
+                // Visual feedback
+                $('#sampleSearchInput').css('background-color', '#d4edda').delay(500).queue(function() {
+                    $(this).css('background-color', '').dequeue();
+                });
+            });
+            
+            // Handler for seqhash ID insertion
+            $('#insertSeqhashIds').click(function() {
+                let seqhashIds = $('#seqhashIds').val().trim();
+                if (!seqhashIds) {
+                    alert('Please enter at least one seqhash ID');
+                    return;
+                }
+                
+                // Parse and format the seqhash IDs
+                const ids = seqhashIds.split(',').map(id => id.trim()).filter(id => id);
+                if (ids.length === 0) {
+                    alert('No valid seqhash IDs found');
+                    return;
+                }
+                
+                // Format the IDs as SQL string literals
+                const formattedIds = ids.map(id => `'${id}'`).join(', ');
+                
+                // Replace the placeholder in the SQL
+                let sql = $('#sqlQuery').val();
+                sql = sql.replace('@seqhash_ids@', formattedIds);
+                $('#sqlQuery').val(sql);
+                
+                // Visual feedback
+                $('#seqhashSearchInput').css('background-color', '#d4edda').delay(500).queue(function() {
+                    $(this).css('background-color', '').dequeue();
+                });
             });
             
             // Run SQL query
