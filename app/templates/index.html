@@ -25,6 +25,31 @@
         }
         .success { background-color: #d4edda; color: #155724; }
         .error { background-color: #f8d7da; color: #721c24; }
+        .progress-container {
+            margin-top: 15px;
+            display: none;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #4CAF50;
+            width: 0%;
+            transition: width 0.5s;
+            text-align: center;
+            color: white;
+            font-size: 12px;
+            line-height: 20px;
+        }
+        .progress-text {
+            margin-top: 5px;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
@@ -51,6 +76,14 @@
         <button type="button" id="createRefSeq">Create Reference FASTA</button>
         
         <div id="dbStatus" class="status"></div>
+        
+        <!-- Progress bar for download -->
+        <div id="progressContainer" class="progress-container">
+            <div class="progress">
+                <div id="progressBar" class="progress-bar" role="progressbar">0%</div>
+            </div>
+            <div id="progressText" class="progress-text">Preparing download...</div>
+        </div>
     </div>
 
     <script>
@@ -73,33 +106,126 @@
                 const btn = $(this);
                 const originalText = btn.text();
                 
-                btn.text('Downloading...').prop('disabled', true);
+                btn.text('Starting...').prop('disabled', true);
                 $('#dbStatus').removeClass('success error').hide();
+                $('#progressContainer').show();
+                $('#progressBar').css('width', '0%').text('0%');
+                $('#progressText').text('Preparing download...');
                 
+                // Start the download
                 $.ajax({
                     url: '/download_database',
                     type: 'POST',
                     success: function(response) {
-                        $('#dbStatus')
-                            .addClass('success')
-                            .text(response.message)
-                            .show();
+                        if (response.status === 'started') {
+                            // Show progress bar and start polling for progress
+                            const s3Path = response.s3_path;
+                            const outputPath = response.output_path;
+                            
+                            // Start monitoring the progress
+                            monitorDownloadProgress(s3Path, outputPath, btn, originalText);
+                        } else if (response.status === 'error') {
+                            // Handle immediate error
+                            $('#progressContainer').hide();
+                            $('#dbStatus')
+                                .addClass('error')
+                                .text(response.message)
+                                .show();
+                            btn.text(originalText).prop('disabled', false);
+                        }
                     },
                     error: function(xhr) {
-                        let errorMessage = 'Download failed';
+                        let errorMessage = 'Failed to start download';
                         if (xhr.responseJSON && xhr.responseJSON.message) {
                             errorMessage = xhr.responseJSON.message;
                         }
+                        $('#progressContainer').hide();
                         $('#dbStatus')
                             .addClass('error')
                             .text(errorMessage)
                             .show();
-                    },
-                    complete: function() {
                         btn.text(originalText).prop('disabled', false);
                     }
                 });
             });
+            
+            // Function to monitor download progress
+            function monitorDownloadProgress(s3Path, outputPath, button, originalButtonText) {
+                let downloadInterval = setInterval(function() {
+                    $.ajax({
+                        url: '/download_progress',
+                        type: 'GET',
+                        data: {
+                            's3_path': s3Path,
+                            'output_path': outputPath
+                        },
+                        success: function(response) {
+                            // Update progress bar
+                            if (response.status === 'downloading' || response.status === 'started') {
+                                const progress = response.progress || 0;
+                                $('#progressBar').css('width', progress + '%').text(progress + '%');
+                                
+                                if (response.human_size) {
+                                    $('#progressText').text(response.human_size + ' - ' + response.message);
+                                } else {
+                                    $('#progressText').text(response.message);
+                                }
+                                
+                                button.text('Downloading...').prop('disabled', true);
+                            } 
+                            else if (response.status === 'success') {
+                                // Download complete
+                                clearInterval(downloadInterval);
+                                $('#progressBar').css('width', '100%').text('100%');
+                                
+                                if (response.human_size) {
+                                    $('#progressText').text(response.human_size + ' - Complete!');
+                                } else {
+                                    $('#progressText').text('Download complete!');
+                                }
+                                
+                                // Show success message
+                                $('#dbStatus')
+                                    .addClass('success')
+                                    .text(response.message)
+                                    .show();
+                                    
+                                // Reset button
+                                button.text(originalButtonText).prop('disabled', false);
+                                
+                                // Hide progress bar after a delay
+                                setTimeout(function() {
+                                    $('#progressContainer').fadeOut();
+                                }, 3000);
+                            }
+                            else if (response.status === 'error') {
+                                // Error occurred
+                                clearInterval(downloadInterval);
+                                $('#progressContainer').hide();
+                                $('#dbStatus')
+                                    .addClass('error')
+                                    .text(response.message)
+                                    .show();
+                                button.text(originalButtonText).prop('disabled', false);
+                            }
+                        },
+                        error: function(xhr) {
+                            // Error checking progress
+                            clearInterval(downloadInterval);
+                            let errorMessage = 'Failed to check download progress';
+                            if (xhr.responseJSON && xhr.responseJSON.message) {
+                                errorMessage = xhr.responseJSON.message;
+                            }
+                            $('#progressContainer').hide();
+                            $('#dbStatus')
+                                .addClass('error')
+                                .text(errorMessage)
+                                .show();
+                            button.text(originalButtonText).prop('disabled', false);
+                        }
+                    });
+                }, 1000); // Check every second
+            }
             
             // Create reference FASTA file
             $('#createRefSeq').click(function() {
@@ -109,16 +235,52 @@
                 btn.text('Creating...').prop('disabled', true);
                 $('#dbStatus').removeClass('success error').hide();
                 
+                // Show progress indication
+                $('#progressContainer').show();
+                $('#progressBar').css('width', '0%').text('0%');
+                $('#progressText').text('Extracting representative sequences...');
+                
+                // Simulate progress for this operation (as we don't have real progress tracking for this one)
+                let fakeProgress = 0;
+                const progressInterval = setInterval(function() {
+                    fakeProgress += Math.random() * 10;
+                    if (fakeProgress > 95) {
+                        fakeProgress = 95; // Cap at 95% until we get the real result
+                    }
+                    $('#progressBar').css('width', fakeProgress + '%').text(Math.floor(fakeProgress) + '%');
+                }, 300);
+                
                 $.ajax({
                     url: '/create_refseq',
                     type: 'POST',
                     success: function(response) {
+                        clearInterval(progressInterval);
+                        
+                        // Complete the progress bar
+                        $('#progressBar').css('width', '100%').text('100%');
+                        
+                        // Update the progress text with sequence count
+                        if (response.count) {
+                            $('#progressText').text(`Extracted ${response.count} representative sequences`);
+                        } else {
+                            $('#progressText').text('Complete!');
+                        }
+                        
+                        // Show success message
                         $('#dbStatus')
                             .addClass('success')
                             .text(response.message + ` (${response.count} sequences)`)
                             .show();
+                            
+                        // Hide progress bar after a delay
+                        setTimeout(function() {
+                            $('#progressContainer').fadeOut();
+                        }, 3000);
                     },
                     error: function(xhr) {
+                        clearInterval(progressInterval);
+                        $('#progressContainer').hide();
+                        
                         let errorMessage = 'Failed to create reference FASTA';
                         if (xhr.responseJSON && xhr.responseJSON.message) {
                             errorMessage = xhr.responseJSON.message;

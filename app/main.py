@@ -48,25 +48,101 @@ def create_app(config_name='default'):
             # Create directory if it doesn't exist
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
             
-            # Run AWS CLI command to download the file
-            cmd = ['aws', 's3', 'cp', s3_path, output_path]
+            # Run AWS CLI command to download the file with progress
+            cmd = ['aws', 's3', 'cp', s3_path, output_path, '--no-progress']
             app.logger.info(f"Running command: {' '.join(cmd)}")
             
-            process = subprocess.run(cmd, capture_output=True, text=True)
-            
-            if process.returncode != 0:
-                app.logger.error(f"AWS S3 download error: {process.stderr}")
-                error_msg = process.stderr.strip() or "Unknown error during database download"
-                return jsonify({'status': 'error', 'message': error_msg}), 500
-            
             return jsonify({
-                'status': 'success', 
-                'message': f"Database downloaded to {output_path}",
-                'path': output_path
+                'status': 'started', 
+                'message': f"Download started from {s3_path}",
+                'output_path': output_path,
+                's3_path': s3_path
             })
             
         except Exception as e:
             app.logger.error(f"Download database error: {str(e)}")
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+            
+    @app.route('/download_progress', methods=['GET'])
+    def download_progress():
+        """Checks the download progress and status."""
+        try:
+            # Get source and destination from the query parameters
+            s3_path = request.args.get('s3_path')
+            output_path = request.args.get('output_path')
+            
+            if not s3_path or not output_path:
+                return jsonify({'status': 'error', 'message': 'Missing parameters'}), 400
+                
+            # If output file exists, get its current size
+            if os.path.exists(output_path):
+                current_size = os.path.getsize(output_path)
+                
+                # Get the total size of the file on S3
+                cmd = ['aws', 's3api', 'head-object', 
+                      '--bucket', app.config['S3_BUCKET'], 
+                      '--key', app.config['S3_DB_KEY']]
+                      
+                process = subprocess.run(cmd, capture_output=True, text=True)
+                
+                if process.returncode == 0:
+                    import json
+                    file_info = json.loads(process.stdout)
+                    total_size = file_info.get('ContentLength', 0)
+                    
+                    # Calculate progress
+                    if total_size > 0:
+                        progress = min(100, int((current_size / total_size) * 100))
+                        
+                        # Check if download is complete
+                        if current_size >= total_size:
+                            return jsonify({
+                                'status': 'success',
+                                'progress': 100,
+                                'message': f"Download complete. File saved to {output_path}",
+                                'current_size': current_size,
+                                'total_size': total_size,
+                                'human_size': f"{current_size / (1024*1024):.2f} MB / {total_size / (1024*1024):.2f} MB"
+                            })
+                        else:
+                            # Still downloading
+                            return jsonify({
+                                'status': 'downloading',
+                                'progress': progress,
+                                'message': f"Downloading: {progress}% complete",
+                                'current_size': current_size,
+                                'total_size': total_size,
+                                'human_size': f"{current_size / (1024*1024):.2f} MB / {total_size / (1024*1024):.2f} MB"
+                            })
+                    else:
+                        return jsonify({
+                            'status': 'unknown',
+                            'message': "Could not determine file size",
+                            'current_size': current_size
+                        })
+                else:
+                    # Couldn't get file info from S3, but file is downloading
+                    return jsonify({
+                        'status': 'downloading',
+                        'message': f"Downloading (size unknown)",
+                        'current_size': current_size
+                    })
+            else:
+                # Start the download if it hasn't started yet
+                cmd = ['aws', 's3', 'cp', s3_path, output_path]
+                process = subprocess.Popen(cmd, 
+                                          stdout=subprocess.PIPE, 
+                                          stderr=subprocess.PIPE,
+                                          text=True)
+                
+                return jsonify({
+                    'status': 'started',
+                    'message': "Download started",
+                    'progress': 0
+                })
+                
+        except Exception as e:
+            app.logger.error(f"Download progress check error: {str(e)}")
             return jsonify({'status': 'error', 'message': str(e)}), 500
     
     @app.route('/create_refseq', methods=['POST'])
