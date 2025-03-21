@@ -228,16 +228,16 @@ def create_app(config_name='default'):
                 
             # Log placeholder check
             if query_name == 'search_samples_by_id':
-                if '{SAMPLE_IDS}' in query_sql:
-                    app.logger.debug("Found {SAMPLE_IDS} placeholder in query template")
+                if 'SAMPLE_IDS_PLACEHOLDER' in query_sql:
+                    app.logger.debug("Found SAMPLE_IDS_PLACEHOLDER in query template")
                 else:
-                    app.logger.error("{SAMPLE_IDS} placeholder NOT found in query template!")
+                    app.logger.error("SAMPLE_IDS_PLACEHOLDER NOT found in query template!")
             
             if query_name == 'search_sequence_by_seqhash':
-                if '{SEQHASH_IDS}' in query_sql:
-                    app.logger.debug("Found {SEQHASH_IDS} placeholder in query template")
+                if 'SEQHASH_IDS_PLACEHOLDER' in query_sql:
+                    app.logger.debug("Found SEQHASH_IDS_PLACEHOLDER in query template")
                 else:
-                    app.logger.error("{SEQHASH_IDS} placeholder NOT found in query template!")
+                    app.logger.error("SEQHASH_IDS_PLACEHOLDER NOT found in query template!")
                 
             return jsonify({
                 'status': 'success',

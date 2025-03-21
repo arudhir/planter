@@ -484,22 +484,22 @@ One sample per line"></textarea>
                                 // Show appropriate input fields for special queries
                                 if (selectedQuery === 'search_samples_by_id') {
                                     // Verify placeholder exists
-                                    if (response.query.indexOf('{SAMPLE_IDS}') !== -1) {
+                                    if (response.query.indexOf('SAMPLE_IDS_PLACEHOLDER') !== -1) {
                                         $('#searchInputContainer').show();
                                         $('#sampleSearchInput').show();
                                     } else {
                                         console.error("Sample IDs placeholder not found in query:", response.query);
-                                        alert("The query template doesn't contain the expected {SAMPLE_IDS} placeholder. Please contact the administrator.");
+                                        alert("The query template doesn't contain the expected SAMPLE_IDS_PLACEHOLDER. Please contact the administrator.");
                                     }
                                 }
                                 else if (selectedQuery === 'search_sequence_by_seqhash') {
                                     // Verify placeholder exists
-                                    if (response.query.indexOf('{SEQHASH_IDS}') !== -1) {
+                                    if (response.query.indexOf('SEQHASH_IDS_PLACEHOLDER') !== -1) {
                                         $('#searchInputContainer').show();
                                         $('#seqhashSearchInput').show();
                                     } else {
                                         console.error("Seqhash IDs placeholder not found in query:", response.query);
-                                        alert("The query template doesn't contain the expected {SEQHASH_IDS} placeholder. Please contact the administrator.");
+                                        alert("The query template doesn't contain the expected SEQHASH_IDS_PLACEHOLDER. Please contact the administrator.");
                                     }
                                 }
                             } else {
@@ -550,13 +550,13 @@ One sample per line"></textarea>
                 // Replace the placeholder in the SQL
                 let sql = $('#sqlQuery').val();
                 const originalSql = sql;
-                sql = sql.replace('{SAMPLE_IDS}', formattedIds);
+                sql = sql.replace('SAMPLE_IDS_PLACEHOLDER', formattedIds);
                 console.log("SQL before:", originalSql);
                 console.log("SQL after:", sql);
                 
                 // Check if replacement actually happened
                 if (sql === originalSql) {
-                    alert('Could not find {SAMPLE_IDS} placeholder in the query. Please ensure the query contains this placeholder.');
+                    alert('Could not find SAMPLE_IDS_PLACEHOLDER in the query. Please ensure the query contains this placeholder.');
                     return;
                 }
                 
@@ -594,13 +594,13 @@ One sample per line"></textarea>
                 // Replace the placeholder in the SQL
                 let sql = $('#sqlQuery').val();
                 const originalSql = sql;
-                sql = sql.replace('{SEQHASH_IDS}', formattedIds);
+                sql = sql.replace('SEQHASH_IDS_PLACEHOLDER', formattedIds);
                 console.log("SQL before:", originalSql);
                 console.log("SQL after:", sql);
                 
                 // Check if replacement actually happened
                 if (sql === originalSql) {
-                    alert('Could not find {SEQHASH_IDS} placeholder in the query. Please ensure the query contains this placeholder.');
+                    alert('Could not find SEQHASH_IDS_PLACEHOLDER in the query. Please ensure the query contains this placeholder.');
                     return;
                 }
                 
