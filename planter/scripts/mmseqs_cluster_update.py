@@ -129,6 +129,7 @@ class MMseqsClusterUpdater:
                 self.paths["sequenceDB"],
                 self.paths["clusterDB"],
                 self.tmp_dir,
+                "--cluster-mode", "2",  # Use longest sequence as representative
             ]
         )
         self.run_command(

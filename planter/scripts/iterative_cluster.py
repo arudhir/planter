@@ -63,12 +63,11 @@ def run_mmseqs_update(script_path, old_reps, new_file, output_dir):
             [
                 sys.executable,
                 mmseqs_script,
-                "--old",
+                "-i",
                 old_reps,
-                "--new",
-                new_file,
-                "--output",
+                "-o",
                 output_dir,
+                new_file,
             ],
             check=True,
         )
