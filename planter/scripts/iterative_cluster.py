@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from tqdm import tqdm
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
@@ -91,7 +93,9 @@ def main():
         files = files[1:]  # Skip the first file if we're using it as initial input
 
     # Process each file
-    for i, file in enumerate(files, start=1):
+    for i, file in enumerate(
+        tqdm(files, desc="Processing files", unit="file"), start=1
+    ):
         output_dir = os.path.join(base_dir, f"output{i}")
         os.makedirs(output_dir, exist_ok=True)
 

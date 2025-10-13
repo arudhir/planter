@@ -23,6 +23,7 @@ dependencies = [
     "seaborn",
     "ipdb",
     "pytest>=8.3.2",
+    "tqdm>=4.67.1",
 ]
 
 [project.scripts]
