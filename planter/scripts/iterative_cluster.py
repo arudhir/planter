@@ -29,6 +29,12 @@ def parse_arguments():
         default="",
         help="Initial old representative sequences file",
     )
+    parser.add_argument(
+        "-d",
+        "--database",
+        default="",
+        help="DuckDB database path (if provided, cluster data will be loaded after clustering)",
+    )
     return parser.parse_args()
 
 
@@ -78,6 +84,64 @@ def run_mmseqs_update(script_path, old_reps, new_file, output_dir):
         sys.exit(1)
 
 
+def load_clusters_to_database(database_path, cluster_tsv, output_dir):
+    """Load cluster data into DuckDB database."""
+    print("\n" + "=" * 80)
+    print("Loading cluster data into database")
+    print("=" * 80)
+    print(f"Database: {database_path}")
+    print(f"Cluster TSV: {cluster_tsv}")
+
+    # Import here to avoid requiring database dependencies if not using this feature
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from planter.database.builder import SequenceDBBuilder
+
+    try:
+        with SequenceDBBuilder(database_path, output_dir=output_dir) as builder:
+            # Check current state
+            result = builder.con.execute("""
+                SELECT
+                    (SELECT COUNT(*) FROM sequences) as total_sequences,
+                    (SELECT COUNT(*) FROM cluster_members) as before_clustered
+            """).fetchone()
+
+            print(f"\nBefore loading:")
+            print(f"  Total sequences: {result[0]:,}")
+            print(f"  Sequences with cluster assignments: {result[1]:,}")
+
+            # Clear existing cluster data to avoid conflicts
+            print("\nClearing existing cluster data...")
+            builder.con.execute("DELETE FROM cluster_members")
+            builder.con.execute("DELETE FROM clusters")
+            builder.con.execute("UPDATE sequences SET is_representative = FALSE")
+
+            # Load new cluster data
+            print("Loading cluster data from TSV...")
+            builder.load_clusters_from_tsv(cluster_tsv)
+
+            # Check new state
+            result = builder.con.execute("""
+                SELECT
+                    (SELECT COUNT(*) FROM cluster_members) as after_clustered,
+                    (SELECT COUNT(*) FROM clusters) as total_clusters,
+                    (SELECT COUNT(*) FROM sequences WHERE is_representative = TRUE) as representatives
+            """).fetchone()
+
+            print(f"\nAfter loading:")
+            print(f"  Sequences with cluster assignments: {result[0]:,}")
+            print(f"  Total clusters: {result[1]:,}")
+            print(f"  Representative sequences: {result[2]:,}")
+            print("\n✓ Cluster data loaded successfully!")
+            print("=" * 80)
+
+    except Exception as e:
+        print(f"\n✗ Error loading cluster data: {e}")
+        print("Clustering completed but cluster data was not loaded into database.")
+        print("You can load it manually later using:")
+        print(f"  python scripts/load_clusters.py -d {database_path} -t {cluster_tsv}")
+        raise
+
+
 def main():
     args = parse_arguments()
     base_dir = setup_output_directory(args.output_dir)
@@ -108,6 +172,18 @@ def main():
 
         # Update old_rep_seqs for the next iteration
         old_rep_seqs = os.path.join(output_dir, "newRepSeqDB.fasta")
+
+    # After all clustering is complete, load cluster data into database if requested
+    if args.database:
+        final_output_num = len(files)
+        final_output_dir = os.path.join(base_dir, f"output{final_output_num}")
+        cluster_tsv = os.path.join(final_output_dir, "newClusterDB.tsv")
+
+        if not os.path.exists(cluster_tsv):
+            print(f"\nWarning: Cluster TSV not found at {cluster_tsv}")
+            print("Cluster data will not be loaded into database.")
+        else:
+            load_clusters_to_database(args.database, cluster_tsv, base_dir)
 
 
 if __name__ == "__main__":
