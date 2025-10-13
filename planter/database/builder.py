@@ -1493,12 +1493,14 @@ class SequenceDBBuilder:
                 )
 
                 # Check for duplicates
-                dup_count = self.con.execute("""
+                dup_check = self.con.execute("""
                     SELECT
-                        COUNT(*) - COUNT(DISTINCT seqhash_id, representative_seqhash_id) as duplicates
+                        COUNT(*) as total,
+                        COUNT(DISTINCT (seqhash_id, representative_seqhash_id)) as unique_pairs
                     FROM temp_clusters
-                """).fetchone()[0]
+                """).fetchone()
 
+                dup_count = dup_check[0] - dup_check[1]
                 if dup_count > 0:
                     self.logger.warning(f"Found {dup_count} duplicate entries in cluster TSV - will deduplicate")
 
