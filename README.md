@@ -255,6 +255,84 @@ This script wraps `mmseqs clusterupdate` and associated commands and statistics 
 
 **n.b.** We are using `mmseqs clusterupdate` to ensure the stability of cluster assignments and avoid redundant clustering.
 
+### Critical Discovery: MMSeqs2 Representative Selection Bug
+
+**Problem Identified (October 2025)**
+
+Through database analysis and testing, we discovered that **65% of cluster representatives were the SHORTEST sequences in their clusters**, not the longest. This caused major issues:
+
+- Full-length sequences were hidden from searches (only representatives are searched)
+- Truncated fragments were returned instead of complete sequences
+- NCBI BLAST returned different results because it searches all sequences
+
+**Root Cause Analysis**
+
+Investigation revealed the issue was in how MMSeqs2 selects cluster representatives:
+
+1. **Default behavior (`--cluster-mode 0`)**: Uses greedy set cover algorithm that picks the sequence with the MOST alignments as representative, regardless of length
+   - Our unit tests proved this actually prefers SHORTER sequences
+   - Database analysis showed 65% of representatives were the shortest in their cluster
+
+2. **Initial fix attempt (`--cluster-mode 2` only)**: Added greedy clustering by sequence length
+   - This STILL didn't work correctly
+   - Created multiple small clusters instead of grouping similar sequences
+
+3. **Complete fix (`--cluster-mode 2 + --cov-mode 1`)**:
+   - `--cluster-mode 2`: Sorts sequences by decreasing length, clusters longest first
+   - `--cov-mode 1`: Calculates coverage on TARGET sequence only, allowing shorter sequences to join longer sequences' clusters
+   - **This combination ensures the longest sequence is ALWAYS selected as representative**
+
+**How We Discovered This**
+
+1. **User reported issue**: Searching for 498 aa Rhodiola UGT returned 241 aa truncated sequence
+2. **Database analysis**: Wrote `tests/database/test_rhodiola_ugt_debug.py` that showed:
+   - Only 38.5% of cluster representatives were the longest sequence
+   - 64.9% were actually the SHORTEST sequence (opposite of desired!)
+   - Some clusters had 261 aa rep when 4,250 aa sequence was available
+3. **Unit tests**: Created `tests/clustering/test_mmseqs_representative_selection.py` with synthetic data proving:
+   - Cluster-mode 0 (default) selects SHORTEST sequences
+   - Cluster-mode 2 alone creates too many clusters
+   - Cluster-mode 2 + cov-mode 1 correctly selects longest
+
+**The Fix**
+
+Updated `planter/scripts/mmseqs_cluster_update.py` line 132:
+```python
+# OLD (broken)
+"--cluster-mode", "2"
+
+# NEW (correct)
+"--cluster-mode", "2",  # Greedy clustering by sequence length
+"--cov-mode", "1",      # Select longest sequence as representative
+```
+
+**Verification**
+
+Run the unit tests to verify correct behavior:
+```bash
+python tests/clustering/test_mmseqs_representative_selection.py
+```
+
+Or with pytest:
+```bash
+pytest tests/clustering/test_mmseqs_representative_selection.py -v -s
+```
+
+The tests use synthetic sequences of known lengths to prove:
+- ✅ Full-length sequences selected over truncated versions
+- ✅ Longest sequence chosen when multiple lengths present
+- ✅ Rhodiola-like scenario (5 full-length + 1 truncated) correctly handled
+- 🔴 Cluster-mode 0 incorrectly selects shortest sequences
+
+**Re-clustering Required**
+
+Existing databases must be re-clustered with the corrected parameters:
+```bash
+python ./planter/scripts/iterative_cluster.py \
+  -g "/path/to/samples/*/transdecoder/*.pep" \
+  -o /path/to/output/repseq_fixed
+```
+
 ## Homology Search
 
 Flask app in `app/`, `python app/main.py`
@@ -375,6 +453,32 @@ Tests for the database creation pipeline:
   - Tests loading expression data from JSON files into the database
   - Validates queries for expression statistics
   - Tests distribution analysis and top expressed sequence retrieval
+
+## Clustering Tests
+
+### MMSeqs2 Representative Selection (`tests/clustering/test_mmseqs_representative_selection.py`)
+
+Unit tests that verify MMSeqs2 clustering correctly selects the longest sequence as representative:
+
+- **Simple Truncation Test**: Full-length vs truncated sequence
+- **Multiple Length Test**: 5 sequences of different lengths (500, 400, 300, 200, 100 aa)
+- **Rhodiola Scenario Test**: Realistic case with 5 full-length + 1 truncated sequence
+- **Cluster Mode Comparison**: Demonstrates difference between modes 0, 2, and 3
+
+Run these tests to verify clustering behavior:
+```bash
+python tests/clustering/test_mmseqs_representative_selection.py
+```
+
+### Rhodiola UGT Debug Tests (`tests/database/test_rhodiola_ugt_debug.py`)
+
+Tests that analyze the actual database to identify clustering issues:
+
+- **Database Analysis**: Checks cluster statistics across all clusters
+- **Baseline vs V2 Comparison**: Compares search results between clustering versions
+- **All Sequences Search**: Tests searching against all sequences vs just representatives
+
+These tests revealed the 65% shortest-sequence representative problem.
 
 ## Running Tests
 
