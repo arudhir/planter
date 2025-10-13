@@ -1133,3 +1133,147 @@ def validate_duckdb_schema(db_path):
                     print(f"  Cluster {cluster[0]}: {cluster[1]} members")
         except Exception as e:
             print(f"Error checking cluster data: {e}")
+
+
+def export_sequences_to_fasta(
+    db_path: Union[str, Path],
+    output_path: Union[str, Path],
+    representatives_only: bool = False,
+    where_clause: Optional[str] = None,
+    chunk_size: int = 10000
+) -> int:
+    """
+    Export sequences from DuckDB to FASTA format.
+
+    Args:
+        db_path: Path to DuckDB database
+        output_path: Path to output FASTA file
+        representatives_only: If True, only export representative sequences
+        where_clause: Optional SQL WHERE clause (without the WHERE keyword)
+        chunk_size: Number of sequences to process at once
+
+    Returns:
+        Number of sequences exported
+
+    Examples:
+        # Export all sequences
+        export_sequences_to_fasta("master.duckdb", "all_sequences.faa")
+
+        # Export only representatives
+        export_sequences_to_fasta("master.duckdb", "repseq.faa", representatives_only=True)
+
+        # Export sequences longer than 400 aa
+        export_sequences_to_fasta("master.duckdb", "long.faa", where_clause="length >= 400")
+    """
+    db_path = Path(db_path)
+    output_path = Path(output_path)
+
+    if not db_path.exists():
+        raise FileNotFoundError(f"Database not found at {db_path}")
+
+    # Build query
+    query = "SELECT seqhash_id, sequence FROM sequences"
+
+    conditions = []
+    if representatives_only:
+        conditions.append("is_representative = true")
+    if where_clause:
+        conditions.append(f"({where_clause})")
+
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+
+    query += " ORDER BY seqhash_id"
+
+    logger.info(f"Connecting to database: {db_path}")
+    conn = duckdb.connect(str(db_path), read_only=True)
+
+    # Get total count (remove ORDER BY for count query)
+    count_query = query.replace("SELECT seqhash_id, sequence", "SELECT COUNT(*)")
+    count_query = count_query.replace(" ORDER BY seqhash_id", "")
+    total = conn.execute(count_query).fetchone()[0]
+    logger.info(f"Total sequences to export: {total:,}")
+
+    # Export in chunks
+    logger.info(f"Exporting to: {output_path}")
+    exported = 0
+    offset = 0
+
+    with open(output_path, 'w') as f:
+        while offset < total:
+            chunk_query = f"{query} LIMIT {chunk_size} OFFSET {offset}"
+            result = conn.execute(chunk_query).fetchall()
+
+            for seqhash_id, sequence in result:
+                f.write(f">{seqhash_id}\n{sequence}\n")
+                exported += 1
+
+            offset += chunk_size
+
+            # Progress logging
+            if offset % (chunk_size * 10) == 0:
+                progress = min(100, (offset / total) * 100)
+                logger.info(f"Progress: {exported:,}/{total:,} ({progress:.1f}%)")
+
+    logger.info(f"Export complete: {exported:,} sequences written to {output_path}")
+    conn.close()
+
+    return exported
+
+
+def get_fasta_path(
+    db_path: Union[str, Path],
+    representatives_only: bool = False,
+    cache_dir: Optional[Union[str, Path]] = None,
+    force_regenerate: bool = False
+) -> Path:
+    """
+    Get path to FASTA file, generating it from database if needed.
+
+    This is a convenience function for tests and scripts that need a FASTA file.
+    It will cache the FASTA file and reuse it unless force_regenerate is True.
+
+    Args:
+        db_path: Path to DuckDB database
+        representatives_only: If True, only export representative sequences
+        cache_dir: Directory to cache FASTA files (default: same dir as database)
+        force_regenerate: If True, regenerate even if cached file exists
+
+    Returns:
+        Path to FASTA file
+
+    Examples:
+        # Get all sequences FASTA (will cache it)
+        fasta_path = get_fasta_path("master.duckdb")
+
+        # Get representatives FASTA
+        repseq_path = get_fasta_path("master.duckdb", representatives_only=True)
+    """
+    db_path = Path(db_path)
+
+    if cache_dir is None:
+        cache_dir = db_path.parent
+    else:
+        cache_dir = Path(cache_dir)
+
+    # Generate filename based on parameters
+    db_name = db_path.stem
+    if representatives_only:
+        fasta_filename = f"{db_name}_repseq.faa"
+    else:
+        fasta_filename = f"{db_name}_all.faa"
+
+    fasta_path = cache_dir / fasta_filename
+
+    # Check if we need to generate
+    if force_regenerate or not fasta_path.exists():
+        logger.info(f"Generating FASTA file: {fasta_path}")
+        export_sequences_to_fasta(
+            db_path=db_path,
+            output_path=fasta_path,
+            representatives_only=representatives_only
+        )
+    else:
+        logger.info(f"Using cached FASTA file: {fasta_path}")
+
+    return fasta_path
