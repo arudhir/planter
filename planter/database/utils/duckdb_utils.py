@@ -682,7 +682,64 @@ def update_clusters(
         max_size = con.execute("SELECT MAX(size) FROM clusters").fetchone()[0]
         logging.info(f"Average cluster size: {avg_size:.2f}")
         logging.info(f"Largest cluster size: {max_size}")
-        
+
+        # Step 8: Ensure ALL sequences with repseq_id are in cluster_members
+        # This handles sequences from previous runs that might not be in the TSV
+        logging.info("Ensuring all clustered sequences are in cluster_members table...")
+
+        # Count sequences that need to be added
+        missing_members = con.execute("""
+            SELECT COUNT(*)
+            FROM sequences s
+            WHERE s.repseq_id IS NOT NULL
+              AND s.seqhash_id NOT IN (SELECT seqhash_id FROM cluster_members)
+        """).fetchone()[0]
+
+        if missing_members > 0:
+            logging.info(f"Found {missing_members} sequences with repseq_id missing from cluster_members")
+
+            # Create missing cluster entries
+            con.execute("""
+                INSERT OR IGNORE INTO clusters (cluster_id, representative_seqhash_id, size)
+                SELECT DISTINCT
+                    repseq_id AS cluster_id,
+                    repseq_id AS representative_seqhash_id,
+                    0 AS size
+                FROM sequences
+                WHERE repseq_id IS NOT NULL
+                  AND repseq_id NOT IN (SELECT cluster_id FROM clusters)
+            """)
+
+            # Insert missing cluster_members
+            con.execute("""
+                INSERT OR IGNORE INTO cluster_members (seqhash_id, cluster_id)
+                SELECT
+                    seqhash_id,
+                    repseq_id AS cluster_id
+                FROM sequences
+                WHERE repseq_id IS NOT NULL
+                  AND seqhash_id NOT IN (SELECT seqhash_id FROM cluster_members)
+            """)
+
+            logging.info(f"Added {missing_members} missing sequences to cluster_members")
+        else:
+            logging.info("All sequences with repseq_id are already in cluster_members")
+
+        # Update all cluster sizes to reflect true membership
+        con.execute("""
+            UPDATE clusters
+            SET size = (
+                SELECT COUNT(*)
+                FROM cluster_members cm
+                WHERE cm.cluster_id = clusters.cluster_id
+            )
+        """)
+
+        # Log final statistics
+        final_member_count = con.execute("SELECT COUNT(*) FROM cluster_members").fetchone()[0]
+        final_cluster_count = con.execute("SELECT COUNT(*) FROM clusters").fetchone()[0]
+        logging.info(f"Final totals: {final_cluster_count} clusters, {final_member_count} cluster members")
+
         # Commit the transaction
         con.execute("COMMIT")
         logging.info("Successfully updated cluster information")
@@ -930,7 +987,8 @@ def extract_representative_sequences(
     query = """
         SELECT seqhash_id, sequence
         FROM sequences
-        WHERE repseq_id = seqhash_id;
+        WHERE repseq_id = seqhash_id           -- Existing representatives
+           OR repseq_id IS NULL;                -- Unclustered sequences (new samples)
     """
 
     try:
