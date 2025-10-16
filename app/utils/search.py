@@ -118,15 +118,19 @@ def fetch_annotations_and_clusters(
             """
             annotations_df = db.execute(annotations_query).fetchdf()
 
-            # Fetch clusters
+            # Fetch clusters - for each hit sequence, get its cluster info including all members
             cluster_query = f"""
-                SELECT ANY_VALUE(cm.seqhash_id) AS target,
+                SELECT
+                    cm.seqhash_id AS target,
                     cm.cluster_id,
-                    GROUP_CONCAT(cm.seqhash_id, ';') AS cluster_members,
-                    COUNT(*) AS cluster_size
+                    (SELECT GROUP_CONCAT(cm2.seqhash_id, ';')
+                     FROM cluster_members cm2
+                     WHERE cm2.cluster_id = cm.cluster_id) AS cluster_members,
+                    (SELECT COUNT(*)
+                     FROM cluster_members cm2
+                     WHERE cm2.cluster_id = cm.cluster_id) AS cluster_size
                 FROM cluster_members cm
                 WHERE cm.seqhash_id IN ({','.join([f"'{x}'" for x in seqhash_ids])})
-                GROUP BY cm.cluster_id
             """
             cluster_df = db.execute(cluster_query).fetchdf()
 
