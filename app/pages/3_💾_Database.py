@@ -92,7 +92,7 @@ st.subheader("📄 Create Reference FASTA")
 
 st.info("""
 This will extract all representative sequences from the database and create a FASTA file for MMSeqs2 searching.
-Only sequences marked as `is_representative = TRUE` will be included.
+Includes both existing cluster representatives AND unclustered sequences from new samples.
 """)
 
 if not db_exists:
@@ -104,7 +104,8 @@ else:
                 # Create directory if needed
                 os.makedirs(os.path.dirname(REPSEQ_FASTA), exist_ok=True)
 
-                # Extract sequences
+                # Extract sequences using same logic as extract_representative_sequences()
+                # Include BOTH existing representatives AND unclustered sequences
                 with duckdb.connect(DUCKDB_PATH, read_only=True) as conn:
                     query = """
                     SELECT
@@ -112,7 +113,8 @@ else:
                     FROM
                         sequences
                     WHERE
-                        is_representative = TRUE;
+                        repseq_id = seqhash_id           -- Existing representatives
+                        OR repseq_id IS NULL;            -- Unclustered sequences (new samples)
                     """
                     result = conn.execute(query).fetchall()
 
