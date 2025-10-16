@@ -178,5 +178,8 @@ bash:
 	docker-compose run --rm planter bash
 
 server:
+	streamlit run app/streamlit_app.py --server.port 8888 --server.address 0.0.0.0
+
+server-flask:
 	FLASK_APP=app/main.py flask run --host=0.0.0.0 --port=8888
 #vim: set noet
