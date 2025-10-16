@@ -109,7 +109,7 @@ def fetch_annotations_and_clusters(
         with duckdb.connect(db_path) as db:
             # Fetch annotations
             annotations_query = f"""
-                SELECT s.seqhash_id AS target, s.sample_id, m.organism,
+                SELECT s.seqhash_id AS target, s.sample_id, s.length, m.organism,
                        a.description, a.cog_category, a.preferred_name
                 FROM sequences s
                 JOIN sra_metadata m ON s.sample_id = m.sample_id
