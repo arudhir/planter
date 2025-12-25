@@ -281,13 +281,19 @@ class MMseqsClusterUpdater:
         )
 
     def _compare_representatives(self) -> Tuple[int, int]:
-        """Compare initial and updated representative sequences using seqkit."""
+        """Compare initial and updated representative sequences using seqkit.
+
+        Returns:
+            Tuple of (new_reps_added, reps_removed)
+        """
         logging.info("Step 6: Comparing representatives.")
 
         original_fasta = os.path.join(self.output_dir, "repSeqDB.fasta")
         updated_fasta = os.path.join(self.output_dir, "newRepSeqDB.fasta")
 
         try:
+            # comm -13: suppress lines unique to FILE1 and lines in both
+            # This gives us lines only in FILE2 (updated but not in original) = NEW sequences
             new_added = int(
                 subprocess.check_output(
                     f"seqkit seq -n {original_fasta} | sort | comm -13 - <(seqkit seq -n {updated_fasta} | sort) | wc -l",
@@ -298,9 +304,12 @@ class MMseqsClusterUpdater:
                 .strip()
             )
 
+            # comm -23: suppress lines unique to FILE2 and lines in both
+            # With original as FILE1 and updated as FILE2 (via process substitution),
+            # this gives lines only in original = REMOVED sequences
             removed = int(
                 subprocess.check_output(
-                    f"seqkit seq -n {updated_fasta} | sort | comm -23 - <(seqkit seq -n {original_fasta} | sort) | wc -l",
+                    f"seqkit seq -n {original_fasta} | sort | comm -23 - <(seqkit seq -n {updated_fasta} | sort) | wc -l",
                     shell=True,
                     executable="/bin/bash",
                 )

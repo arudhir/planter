@@ -1133,3 +1133,222 @@ def validate_duckdb_schema(db_path):
                     print(f"  Cluster {cluster[0]}: {cluster[1]} members")
         except Exception as e:
             print(f"Error checking cluster data: {e}")
+
+
+# =============================================================================
+# New Immutable Clustering Functions
+# =============================================================================
+
+def extract_representative_sequences_v2(
+    db_path: Union[str, Path],
+    output_path: Union[str, Path]
+) -> Path:
+    """
+    Extract representative sequences from the latest completed clustering run.
+
+    This version uses the new immutable clustering architecture (versioned_clusters).
+    Falls back to legacy behavior if no clustering runs exist.
+
+    Args:
+        db_path: Path to the DuckDB database
+        output_path: Path to save the FASTA file
+
+    Returns:
+        Path to the output file
+    """
+    db_path = Path(str(db_path)).resolve()
+    output_path = Path(str(output_path)).resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    logger.info(f"Extracting representative sequences from {db_path}")
+
+    con = duckdb.connect(str(db_path))
+    try:
+        # Check if new clustering tables exist
+        tables = con.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='versioned_clusters'"
+        ).fetchall()
+
+        if tables:
+            # Use new immutable clustering architecture
+            query = """
+                SELECT s.seqhash_id, s.sequence
+                FROM versioned_clusters vc
+                JOIN sequences s ON vc.representative_seqhash_id = s.seqhash_id
+                WHERE vc.run_id = (
+                    SELECT MAX(run_id)
+                    FROM clustering_runs
+                    WHERE status = 'completed'
+                )
+            """
+        else:
+            # Fall back to legacy approach
+            logger.warning("Using legacy clustering tables (versioned_clusters not found)")
+            query = """
+                SELECT seqhash_id, sequence
+                FROM sequences
+                WHERE repseq_id = seqhash_id
+            """
+
+        results = con.execute(query).fetchall()
+
+        # Write to FASTA
+        seq_records = [
+            SeqRecord(Seq(seq), id=seq_id, description="")
+            for seq_id, seq in results
+        ]
+
+        with output_path.open("w") as fasta_file:
+            SeqIO.write(seq_records, fasta_file, "fasta")
+
+        logger.info(f"Successfully extracted {len(seq_records)} representative sequences to {output_path}")
+        return output_path
+
+    except Exception as e:
+        logger.error(f"Error extracting representative sequences: {e}")
+        raise
+
+    finally:
+        con.close()
+
+
+def apply_clustering_schema(db_path: Union[str, Path]) -> None:
+    """
+    Apply the immutable clustering schema to a database.
+
+    This creates the clustering_runs, versioned_clusters, and
+    versioned_cluster_members tables if they don't exist.
+
+    Args:
+        db_path: Path to the DuckDB database
+    """
+    db_path = str(db_path)
+    schema_path = Path(__file__).parent.parent / "schema" / "migrations" / "005_immutable_clustering.sql"
+
+    con = duckdb.connect(db_path)
+    try:
+        if schema_path.exists():
+            schema_sql = schema_path.read_text()
+            for statement in schema_sql.split(";"):
+                statement = statement.strip()
+                if statement and not statement.startswith("--"):
+                    try:
+                        con.execute(statement)
+                    except Exception as e:
+                        if "already exists" not in str(e).lower():
+                            logger.warning(f"Schema statement warning: {e}")
+        else:
+            # Create tables directly
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS clustering_runs (
+                    run_id INTEGER PRIMARY KEY,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    completed_at TIMESTAMP,
+                    status VARCHAR DEFAULT 'pending',
+                    parameters VARCHAR,
+                    sequence_count INTEGER,
+                    cluster_count INTEGER,
+                    notes VARCHAR
+                )
+            """)
+
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS versioned_clusters (
+                    run_id INTEGER NOT NULL,
+                    cluster_id VARCHAR NOT NULL,
+                    representative_seqhash_id VARCHAR NOT NULL,
+                    size INTEGER NOT NULL,
+                    PRIMARY KEY (run_id, cluster_id)
+                )
+            """)
+
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS versioned_cluster_members (
+                    run_id INTEGER NOT NULL,
+                    seqhash_id VARCHAR NOT NULL,
+                    cluster_id VARCHAR NOT NULL,
+                    PRIMARY KEY (run_id, seqhash_id)
+                )
+            """)
+
+        logger.info(f"Applied immutable clustering schema to {db_path}")
+
+    finally:
+        con.close()
+
+
+def get_clustering_stats(db_path: Union[str, Path]) -> Dict:
+    """
+    Get statistics about the current clustering state.
+
+    Returns:
+        Dictionary with clustering statistics
+    """
+    db_path = str(db_path)
+    con = duckdb.connect(db_path)
+
+    try:
+        # Check which tables exist
+        tables = {row[0] for row in con.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()}
+
+        stats = {}
+
+        # Check for new architecture
+        if "versioned_clusters" in tables:
+            run_info = con.execute("""
+                SELECT run_id, created_at, sequence_count, cluster_count
+                FROM clustering_runs
+                WHERE status = 'completed'
+                ORDER BY run_id DESC
+                LIMIT 1
+            """).fetchone()
+
+            if run_info:
+                stats["architecture"] = "immutable_versioned"
+                stats["current_run_id"] = run_info[0]
+                stats["last_clustering_at"] = run_info[1]
+                stats["sequence_count"] = run_info[2]
+                stats["cluster_count"] = run_info[3]
+
+                # Get cluster size distribution
+                size_stats = con.execute("""
+                    SELECT
+                        AVG(size) as avg_size,
+                        MIN(size) as min_size,
+                        MAX(size) as max_size
+                    FROM versioned_clusters
+                    WHERE run_id = ?
+                """, [run_info[0]]).fetchone()
+
+                stats["avg_cluster_size"] = size_stats[0]
+                stats["min_cluster_size"] = size_stats[1]
+                stats["max_cluster_size"] = size_stats[2]
+            else:
+                stats["architecture"] = "immutable_versioned"
+                stats["current_run_id"] = None
+                stats["cluster_count"] = 0
+
+        # Check for legacy architecture
+        elif "clusters" in tables:
+            stats["architecture"] = "legacy_mutable"
+            cluster_count = con.execute("SELECT COUNT(*) FROM clusters").fetchone()[0]
+            stats["cluster_count"] = cluster_count
+
+            if cluster_count > 0:
+                size_stats = con.execute("""
+                    SELECT AVG(size), MIN(size), MAX(size) FROM clusters
+                """).fetchone()
+                stats["avg_cluster_size"] = size_stats[0]
+                stats["min_cluster_size"] = size_stats[1]
+                stats["max_cluster_size"] = size_stats[2]
+
+        else:
+            stats["architecture"] = "none"
+            stats["cluster_count"] = 0
+
+        return stats
+
+    finally:
+        con.close()
