@@ -1,5 +1,6 @@
 outputs/*
 tests/test-output
+tests/**/test_output
 references/*
 .snakemake/*
 __pycache__
@@ -10,3 +11,4 @@ planter.egg-info/
 test_out/
 .nextflow*
 nextflow_run*
+node_modules/

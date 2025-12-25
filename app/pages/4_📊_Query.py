@@ -2,16 +2,22 @@
 Database Query Page
 """
 import streamlit as st
+import sys
 import duckdb
 import pandas as pd
 from pathlib import Path
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from config import Config
 
 st.set_page_config(page_title="Database Query", page_icon="📊", layout="wide")
 
 st.title("📊 Database Query")
 
 # Configuration
-DUCKDB_PATH = "/mnt/data4/master.duckdb"
+DUCKDB_PATH = Config.DUCKDB_PATH
 QUERY_DIR = Path("/home/ubuntu/planter/planter/database/queries/sql")
 
 # Preset queries
@@ -21,11 +27,13 @@ PRESET_QUERIES = {
     "organism_summary": "Organism Summary",
     "sample_stats": "Sample Statistics",
     "cluster_stats": "Cluster Statistics",
+    "cluster_size_by_seqhash": "Cluster Member Lengths by Seqhash IDs",
+    "search_sequence_by_seqhash": "Search Sequences by Seqhash IDs",
     "go_term_summary": "GO Term Summary",
     "ec_number_summary": "EC Number Summary"
 }
 
-@st.cache_data
+@st.cache_data(ttl=60)
 def load_preset_query(query_name: str) -> str:
     """Load a preset SQL query from file."""
     if not query_name:

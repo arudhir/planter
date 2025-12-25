@@ -9,28 +9,37 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from utils.search import process_search_request
+from config import Config
 
 st.set_page_config(page_title="Search", page_icon="🔍", layout="wide")
 
 st.title("🔍 MMSeqs2 Protein Sequence Search")
 
 # Configuration
-FASTA_PATH = "/mnt/data4/repseq.faa"
-DUCKDB_PATH = "/mnt/data4/master.duckdb"
-EXAMPLE_FASTA_PATH = "/home/ubuntu/planter/test_data/example.fasta"
+FASTA_PATH = Config.REPSEQ_FASTA
+DUCKDB_PATH = Config.DUCKDB_PATH
+EXAMPLE_FASTA_PATH = Config.EXAMPLE_FASTA
 
 # Sequence input
 st.subheader("Enter Protein Sequence")
+
+# Initialize session state for sequence if not exists
+if 'sequence' not in st.session_state:
+    st.session_state.sequence = ""
 
 col1, col2 = st.columns([4, 1])
 
 with col1:
     sequence = st.text_area(
         "Protein Sequence (FASTA format or raw sequence)",
+        value=st.session_state.sequence,
         height=200,
         placeholder="Enter your protein sequence here...",
-        help="You can paste a FASTA format sequence (with >header) or just the raw sequence"
+        help="You can paste a FASTA format sequence (with >header) or just the raw sequence",
+        key="sequence_input"
     )
+    # Update session state when text area changes
+    st.session_state.sequence = sequence
 
 with col2:
     st.write("") # Spacing
@@ -43,10 +52,6 @@ with col2:
                 st.rerun()
         except FileNotFoundError:
             st.error("Example file not found")
-
-# Use session state if exists
-if 'sequence' in st.session_state:
-    sequence = st.session_state.sequence
 
 # Advanced parameters
 with st.expander("⚙️ Advanced Search Parameters"):

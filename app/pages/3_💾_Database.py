@@ -4,18 +4,24 @@ Database Management Page
 import streamlit as st
 import subprocess
 import os
+import sys
 import duckdb
 from pathlib import Path
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from config import Config
 
 st.set_page_config(page_title="Database Management", page_icon="💾", layout="wide")
 
 st.title("💾 Database Management")
 
 # Configuration
-DUCKDB_PATH = "/mnt/data4/master.duckdb"
-REPSEQ_FASTA = "/mnt/data4/repseq.faa"
-S3_BUCKET = "recombia.planter"
-S3_DB_KEY = "master.duckdb"
+DUCKDB_PATH = Config.DUCKDB_PATH
+REPSEQ_FASTA = Config.REPSEQ_FASTA
+S3_BUCKET = Config.S3_BUCKET
+S3_DB_KEY = Config.S3_DB_KEY
 
 # Database information
 st.subheader("Database Information")
@@ -191,7 +197,7 @@ with st.expander("❓ Help"):
     - Required for the Search functionality to work
 
     ### File Locations
-    - **Database**: `/mnt/data4/master.duckdb`
+    - **Database**: `/mnt/data4/recombia.planter/master.duckdb`
     - **Reference FASTA**: `/mnt/data4/repseq.faa`
     - **Temp Directory**: `/mnt/data4/tmp`
     """)

@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 class Config:
-    DUCKDB_PATH = os.environ.get('DUCKDB_PATH') or '/mnt/data4/master.duckdb'
+    DUCKDB_PATH = os.environ.get('DUCKDB_PATH') or '/mnt/data4/recombia.planter/master.duckdb'
 
     # Toggle: set to False to search ALL sequences, True for representatives only
     USE_REPRESENTATIVES_ONLY = os.environ.get('USE_REPRESENTATIVES_ONLY', 'false').lower() == 'true'

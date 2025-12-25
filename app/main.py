@@ -616,7 +616,7 @@ import pandas as pd
 
 def run_mmseqs2_search(sequence, db_path, sensitivity=4.0, e_value=0.001, coverage=0.0, max_seqs=300, alignment_mode=3, mask=1, min_seq_id=0.0):
     """Runs MMSeqs2 search and returns parsed results as a DataFrame.
-    
+
     Args:
         sequence: The protein sequence to search
         db_path: Path to the reference database
@@ -631,7 +631,7 @@ def run_mmseqs2_search(sequence, db_path, sensitivity=4.0, e_value=0.001, covera
     current_app.logger.debug(f"Running MMSeqs2 search with sequence: {sequence}")
     current_app.logger.debug(f"MMSeqs2 Parameters: s={sensitivity}, e={e_value}, c={coverage}, max-seqs={max_seqs}, alignment-mode={alignment_mode}, mask={mask}, min-seq-id={min_seq_id}")
 
-    with tempfile.TemporaryDirectory() as temp_dir:
+    with tempfile.TemporaryDirectory(dir='/mnt/data4/tmp') as temp_dir:
         input_file = os.path.join(temp_dir, "input.fasta")
         output_file = os.path.join(temp_dir, "output.tsv")
         tmp_dir = os.path.join(temp_dir, "tmp")
@@ -648,22 +648,30 @@ def run_mmseqs2_search(sequence, db_path, sensitivity=4.0, e_value=0.001, covera
             "--max-seqs", str(max_seqs),
             "--alignment-mode", str(alignment_mode),
             "--mask", str(mask),
-            "--min-seq-id", str(min_seq_id)
+            "--min-seq-id", str(min_seq_id),
+            "-v", "0"  # Suppress verbose output to prevent pipe deadlock
         ]
 
-        process = subprocess.run(mmseqs_command, capture_output=True, text=True)
+        # Use subprocess.run with stdout redirected to DEVNULL to prevent pipe deadlock
+        current_app.logger.debug(f"Starting MMSeqs2 subprocess...")
+        process = subprocess.run(mmseqs_command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=60)
+        current_app.logger.debug(f"MMSeqs2 completed with return code: {process.returncode}")
+
         if process.returncode != 0:
             current_app.logger.error(f"MMSeqs2 Error: {process.stderr}")
             return pd.DataFrame(), f"MMSeqs2 failed: {process.stderr}"
 
         if not os.path.exists(output_file):
+            current_app.logger.error("MMSeqs2 did not produce an output file")
             return pd.DataFrame(), "MMSeqs2 did not produce an output file"
 
+        current_app.logger.debug(f"Reading results from {output_file}")
         df = pd.read_csv(output_file, sep='\t', names=[
-            'query', 'target', 'pident', 'alnlen', 'mismatch', 'gapopen', 
+            'query', 'target', 'pident', 'alnlen', 'mismatch', 'gapopen',
             'qstart', 'qend', 'tstart', 'tend', 'evalue', 'bits', 'tseq'
         ])
-        
+        current_app.logger.debug(f"Found {len(df)} results")
+
     return df, None
 
 def fetch_annotations_and_clusters(seqhash_ids, db_path):
@@ -842,10 +850,12 @@ def run_pipeline_job(app, job_id, cores, outdir, s3_bucket, samples, jobs_dict, 
 
 def process_search_request(sequence, fasta_path, duckdb_path, search_params=None):
     """Handles the entire search process and merges MMSeqs2 results with metadata."""
+    current_app.logger.debug(f"process_search_request called with sequence length: {len(sequence)}")
+
     # Extract search parameters (if provided)
     if search_params is None:
         search_params = {}
-    
+
     sensitivity = float(search_params.get('sensitivity', 4.0))
     e_value = float(search_params.get('e_value', 0.001))
     coverage = float(search_params.get('coverage', 0.0))
@@ -853,36 +863,47 @@ def process_search_request(sequence, fasta_path, duckdb_path, search_params=None
     alignment_mode = int(search_params.get('alignment_mode', 3))
     mask = int(search_params.get('mask', 1))
     min_seq_id = float(search_params.get('min_seq_id', 0.0))
-    
+
+    current_app.logger.debug("Calling run_mmseqs2_search...")
     # Run MMSeqs2 search with parameters
     mmseqs_df, error = run_mmseqs2_search(
-        sequence, fasta_path, 
-        sensitivity=sensitivity, 
-        e_value=e_value, 
-        coverage=coverage, 
-        max_seqs=max_seqs, 
-        alignment_mode=alignment_mode, 
+        sequence, fasta_path,
+        sensitivity=sensitivity,
+        e_value=e_value,
+        coverage=coverage,
+        max_seqs=max_seqs,
+        alignment_mode=alignment_mode,
         mask=mask,
         min_seq_id=min_seq_id
     )
-    
+
+    current_app.logger.debug(f"run_mmseqs2_search returned, error={error}")
+
     if error:
+        current_app.logger.error(f"MMSeqs2 search error: {error}")
         return {'headers': ['Error'], 'data': [{'Error': error}]}
 
     if mmseqs_df.empty:
+        current_app.logger.info("No results found from MMSeqs2")
         return {'headers': ['Error'], 'data': [{'Error': "No results found"}]}
+
+    current_app.logger.debug(f"Found {len(mmseqs_df)} MMSeqs2 results")
 
     # Get sequence ids from mmseqs results
     seqhash_ids = mmseqs_df['target'].unique().tolist()
+    current_app.logger.debug(f"Fetching annotations for {len(seqhash_ids)} unique targets")
 
     # Fetch annotations and clusters from duckdb
     annotations_df, cluster_df = fetch_annotations_and_clusters(seqhash_ids, duckdb_path)
+    current_app.logger.debug(f"Got {len(annotations_df)} annotations, {len(cluster_df)} clusters")
 
     # Merge annotations
     merged_df = mmseqs_df.merge(annotations_df, on='target', how='left')
+    current_app.logger.debug(f"After annotation merge: {len(merged_df)} rows")
 
     # Merge clusters
     merged_df = merged_df.merge(cluster_df, on='target', how='left').dropna()
+    current_app.logger.debug(f"After cluster merge and dropna: {len(merged_df)} rows")
 
     # Add search parameters to the results metadata for display
     search_metadata = {

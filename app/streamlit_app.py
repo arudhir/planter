@@ -5,6 +5,7 @@ Main entry point for the Streamlit application.
 """
 import streamlit as st
 from pathlib import Path
+from config import Config
 
 # Page configuration
 st.set_page_config(
@@ -49,7 +50,7 @@ Select a page from the sidebar to get started.
 # Show system information
 with st.expander("System Information"):
     st.info(f"""
-    **Database Path**: `/mnt/data4/master.duckdb`
-    **Reference FASTA**: `/mnt/data4/repseq.faa`
+    **Database Path**: `{Config.DUCKDB_PATH}`
+    **Reference FASTA**: `{Config.REPSEQ_FASTA}`
     **Temp Directory**: `/mnt/data4/tmp`
     """)
