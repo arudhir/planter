@@ -13,7 +13,11 @@ import duckdb
 import pandas as pd
 
 from planter.database.utils.duckdb_utils import (
-    merge_duckdbs, update_clusters)
+    merge_duckdbs, update_clusters,
+    extract_representative_sequences_v2,
+    apply_clustering_schema,
+    get_clustering_stats
+)
 
 
 class TestDuckDBUtils(unittest.TestCase):
@@ -699,6 +703,197 @@ class TestDuckDBUtils(unittest.TestCase):
         self.assertNotIn("seq5", member_to_rep, "seq5 should not be in any cluster")
 
         con.close()
+
+
+class TestImmutableClusteringFunctions(unittest.TestCase):
+    """Test cases for the new immutable clustering utility functions."""
+
+    def setUp(self):
+        """Set up test environment."""
+        self.temp_dir = tempfile.mkdtemp()
+        self.db_path = Path(self.temp_dir) / "test.duckdb"
+
+        # Create a basic database with sequences
+        con = duckdb.connect(str(self.db_path))
+        con.execute("""
+            CREATE TABLE sra_metadata (
+                sample_id VARCHAR PRIMARY KEY,
+                organism VARCHAR
+            )
+        """)
+        con.execute("""
+            CREATE TABLE sequences (
+                seqhash_id VARCHAR PRIMARY KEY,
+                sequence VARCHAR NOT NULL,
+                sample_id VARCHAR NOT NULL,
+                length INTEGER NOT NULL,
+                repseq_id VARCHAR
+            )
+        """)
+        con.execute("INSERT INTO sra_metadata VALUES ('sample1', 'Test organism')")
+        con.execute("INSERT INTO sequences VALUES ('seq1', 'ACGT', 'sample1', 4, 'seq1')")
+        con.execute("INSERT INTO sequences VALUES ('seq2', 'TGCA', 'sample1', 4, 'seq1')")
+        con.execute("INSERT INTO sequences VALUES ('seq3', 'AAAA', 'sample1', 4, 'seq3')")
+        con.close()
+
+    def tearDown(self):
+        """Clean up after tests."""
+        shutil.rmtree(self.temp_dir)
+
+    def test_apply_clustering_schema(self):
+        """Test applying the immutable clustering schema."""
+        apply_clustering_schema(self.db_path)
+
+        con = duckdb.connect(str(self.db_path))
+        tables = {row[0] for row in con.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()}
+        con.close()
+
+        self.assertIn("clustering_runs", tables)
+        self.assertIn("versioned_clusters", tables)
+        self.assertIn("versioned_cluster_members", tables)
+
+    def test_apply_clustering_schema_idempotent(self):
+        """Test that applying schema multiple times is safe."""
+        apply_clustering_schema(self.db_path)
+        apply_clustering_schema(self.db_path)  # Should not raise
+
+        con = duckdb.connect(str(self.db_path))
+        tables = con.execute(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='clustering_runs'"
+        ).fetchone()[0]
+        con.close()
+
+        self.assertEqual(tables, 1)
+
+    def test_get_clustering_stats_no_clustering(self):
+        """Test get_clustering_stats with no clustering tables."""
+        stats = get_clustering_stats(self.db_path)
+
+        self.assertEqual(stats["architecture"], "none")
+        self.assertEqual(stats["cluster_count"], 0)
+
+    def test_get_clustering_stats_with_new_architecture(self):
+        """Test get_clustering_stats with new immutable architecture."""
+        apply_clustering_schema(self.db_path)
+
+        # Create a completed clustering run
+        con = duckdb.connect(str(self.db_path))
+        con.execute("""
+            INSERT INTO clustering_runs (run_id, status, sequence_count, cluster_count)
+            VALUES (1, 'completed', 3, 2)
+        """)
+        con.execute("""
+            INSERT INTO versioned_clusters (run_id, cluster_id, representative_seqhash_id, size)
+            VALUES (1, 'CLU_a', 'seq1', 2), (1, 'CLU_b', 'seq3', 1)
+        """)
+        con.close()
+
+        stats = get_clustering_stats(self.db_path)
+
+        self.assertEqual(stats["architecture"], "immutable_versioned")
+        self.assertEqual(stats["current_run_id"], 1)
+        self.assertEqual(stats["cluster_count"], 2)
+        self.assertEqual(stats["sequence_count"], 3)
+
+    def test_get_clustering_stats_with_legacy_architecture(self):
+        """Test get_clustering_stats with legacy mutable architecture."""
+        # Add legacy cluster tables
+        con = duckdb.connect(str(self.db_path))
+        con.execute("""
+            CREATE TABLE clusters (
+                cluster_id VARCHAR PRIMARY KEY,
+                representative_seqhash_id VARCHAR,
+                size INTEGER
+            )
+        """)
+        con.execute("""
+            INSERT INTO clusters VALUES ('cluster1', 'seq1', 2), ('cluster2', 'seq3', 1)
+        """)
+        con.close()
+
+        stats = get_clustering_stats(self.db_path)
+
+        self.assertEqual(stats["architecture"], "legacy_mutable")
+        self.assertEqual(stats["cluster_count"], 2)
+
+    def test_extract_representative_sequences_v2_legacy_fallback(self):
+        """Test extracting representatives with legacy architecture."""
+        output_path = Path(self.temp_dir) / "reps.fasta"
+
+        extract_representative_sequences_v2(self.db_path, output_path)
+
+        self.assertTrue(output_path.exists())
+        content = output_path.read_text()
+
+        # With legacy, sequences where repseq_id = seqhash_id are returned
+        # seq1 and seq3 should be present (they point to themselves)
+        self.assertIn(">seq1", content)
+        self.assertIn(">seq3", content)
+
+    def test_extract_representative_sequences_v2_new_architecture(self):
+        """Test extracting representatives with new immutable architecture."""
+        apply_clustering_schema(self.db_path)
+
+        # Create a completed clustering run with seq1 as sole representative
+        con = duckdb.connect(str(self.db_path))
+        con.execute("""
+            INSERT INTO clustering_runs (run_id, status, sequence_count, cluster_count)
+            VALUES (1, 'completed', 3, 1)
+        """)
+        con.execute("""
+            INSERT INTO versioned_clusters (run_id, cluster_id, representative_seqhash_id, size)
+            VALUES (1, 'CLU_a', 'seq1', 3)
+        """)
+        con.close()
+
+        output_path = Path(self.temp_dir) / "reps.fasta"
+        extract_representative_sequences_v2(self.db_path, output_path)
+
+        self.assertTrue(output_path.exists())
+        content = output_path.read_text()
+
+        # Only seq1 should be present (the representative)
+        self.assertIn(">seq1", content)
+        self.assertIn("ACGT", content)
+        # seq3 should NOT be present (not a representative in new run)
+        lines = content.strip().split('\n')
+        headers = [l for l in lines if l.startswith('>')]
+        self.assertEqual(len(headers), 1)
+
+    def test_extract_representative_sequences_v2_uses_latest_run(self):
+        """Test that extraction uses the latest completed run."""
+        apply_clustering_schema(self.db_path)
+
+        con = duckdb.connect(str(self.db_path))
+        # Create two completed runs with different representatives
+        con.execute("""
+            INSERT INTO clustering_runs (run_id, status, sequence_count, cluster_count)
+            VALUES (1, 'completed', 3, 1), (2, 'completed', 3, 2)
+        """)
+        # Run 1: seq1 is only rep
+        con.execute("""
+            INSERT INTO versioned_clusters (run_id, cluster_id, representative_seqhash_id, size)
+            VALUES (1, 'CLU_a', 'seq1', 3)
+        """)
+        # Run 2: seq1 and seq3 are reps
+        con.execute("""
+            INSERT INTO versioned_clusters (run_id, cluster_id, representative_seqhash_id, size)
+            VALUES (2, 'CLU_a', 'seq1', 2), (2, 'CLU_b', 'seq3', 1)
+        """)
+        con.close()
+
+        output_path = Path(self.temp_dir) / "reps.fasta"
+        extract_representative_sequences_v2(self.db_path, output_path)
+
+        content = output_path.read_text()
+        headers = [l for l in content.strip().split('\n') if l.startswith('>')]
+
+        # Should use run 2 (latest), which has 2 representatives
+        self.assertEqual(len(headers), 2)
+        self.assertIn(">seq1", content)
+        self.assertIn(">seq3", content)
 
 
 if __name__ == "__main__":
