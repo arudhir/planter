@@ -49,6 +49,7 @@ class TestDuckDBUtils(unittest.TestCase):
                 sequence VARCHAR,
                 length INTEGER,
                 description VARCHAR,
+                is_representative BOOLEAN NOT NULL DEFAULT FALSE,
                 repseq_id VARCHAR
             );
             
@@ -109,7 +110,7 @@ class TestDuckDBUtils(unittest.TestCase):
         con1.execute(open(self.schema_sql_path).read())
         con1.execute("INSERT INTO sra_metadata VALUES ('SRR1', 'Organism1', 'Study1');")
         con1.execute(
-            "INSERT INTO sequences VALUES ('seq1', 'SRR1', 'ACGT', 4, 'Seq1', 'seq1');"
+            "INSERT INTO sequences VALUES ('seq1', 'SRR1', 'ACGT', 4, 'Seq1', FALSE, 'seq1');"
         )
         con1.execute("INSERT INTO annotations VALUES ('seq1', 'source1', 'value1');")
         con1.execute("INSERT INTO go_terms VALUES ('seq1', 'GO:0001');")
@@ -128,7 +129,7 @@ class TestDuckDBUtils(unittest.TestCase):
         con2.execute(open(self.schema_sql_path).read())
         con2.execute("INSERT INTO sra_metadata VALUES ('SRR2', 'Organism2', 'Study2');")
         con2.execute(
-            "INSERT INTO sequences VALUES ('seq2', 'SRR2', 'TGCA', 4, 'Seq2', 'seq2');"
+            "INSERT INTO sequences VALUES ('seq2', 'SRR2', 'TGCA', 4, 'Seq2', FALSE, 'seq2');"
         )
         con2.execute("INSERT INTO annotations VALUES ('seq2', 'source2', 'value2');")
         con2.execute("INSERT INTO go_terms VALUES ('seq2', 'GO:0002');")
@@ -291,8 +292,8 @@ class TestDuckDBUtils(unittest.TestCase):
         con1.execute("INSERT INTO sra_metadata VALUES ('SRR1', 'Organism1', 'Study1')")
         for i in range(5):  # First 5 sequences
             con1.execute(
-                "INSERT INTO sequences VALUES (?, ?, ?, ?, ?, ?)",
-                [seq_ids[i], "SRR1", f"ACGT{i}", i + 1, f"Seq {i}", seq_ids[i]],
+                "INSERT INTO sequences VALUES (?, ?, ?, ?, ?, ?, ?)",
+                [seq_ids[i], "SRR1", f"ACGT{i}", i + 1, f"Seq {i}", False, seq_ids[i]],
             )
         con1.close()
 
@@ -304,8 +305,8 @@ class TestDuckDBUtils(unittest.TestCase):
         con2.execute("INSERT INTO sra_metadata VALUES ('SRR2', 'Organism2', 'Study2')")
         for i in range(5, 10):  # Last 5 sequences
             con2.execute(
-                "INSERT INTO sequences VALUES (?, ?, ?, ?, ?, ?)",
-                [seq_ids[i], "SRR2", f"ACGT{i}", i + 1, f"Seq {i}", seq_ids[i]],
+                "INSERT INTO sequences VALUES (?, ?, ?, ?, ?, ?, ?)",
+                [seq_ids[i], "SRR2", f"ACGT{i}", i + 1, f"Seq {i}", False, seq_ids[i]],
             )
         con2.close()
 
@@ -700,7 +701,11 @@ class TestDuckDBUtils(unittest.TestCase):
         self.assertEqual(
             member_to_rep["seq4"], "seq3", "seq4 should be in seq3's cluster"
         )
-        self.assertNotIn("seq5", member_to_rep, "seq5 should not be in any cluster")
+        # seq5 is auto-populated as a singleton cluster (its own representative)
+        # since it exists in sequences but wasn't in the clustering TSV
+        self.assertEqual(
+            member_to_rep["seq5"], "seq5", "seq5 should be in its own singleton cluster"
+        )
 
         con.close()
 

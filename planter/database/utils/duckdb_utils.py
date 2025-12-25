@@ -1285,6 +1285,18 @@ def apply_clustering_schema(db_path: Union[str, Path]) -> None:
 
     con = duckdb.connect(db_path)
     try:
+        # First check if tables already exist
+        existing_tables = {row[0] for row in con.execute(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
+        ).fetchall()}
+
+        if "clustering_runs" in existing_tables:
+            # Schema already applied
+            logger.debug(f"Clustering schema already exists in {db_path}")
+            return
+
+        use_fallback = False
+
         if schema_path.exists():
             schema_sql = schema_path.read_text()
             for statement in schema_sql.split(";"):
@@ -1293,10 +1305,23 @@ def apply_clustering_schema(db_path: Union[str, Path]) -> None:
                     try:
                         con.execute(statement)
                     except Exception as e:
-                        if "already exists" not in str(e).lower():
-                            logger.warning(f"Schema statement warning: {e}")
+                        error_msg = str(e).lower()
+                        # Ignore "already exists" errors
+                        if "already exists" in error_msg:
+                            continue
+                        # FK constraint failures or table-not-found errors mean we should use fallback
+                        if any(x in error_msg for x in ["foreign key", "not found", "does not exist"]):
+                            logger.debug(f"Migration statement failed (using fallback): {e}")
+                            use_fallback = True
+                            break
+                        else:
+                            # Other errors should be raised
+                            raise
         else:
-            # Create tables directly
+            use_fallback = True
+
+        if use_fallback:
+            # Create tables without FK constraints
             con.execute("""
                 CREATE TABLE IF NOT EXISTS clustering_runs (
                     run_id INTEGER PRIMARY KEY,

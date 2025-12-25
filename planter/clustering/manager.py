@@ -39,18 +39,41 @@ class ClusteringManager:
         """Ensure the clustering schema exists."""
         schema_path = Path(__file__).parent.parent / "database" / "schema" / "migrations" / "005_immutable_clustering.sql"
 
+        # First check if tables already exist
+        existing_tables = {row[0] for row in con.execute(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'"
+        ).fetchall()}
+
+        if "clustering_runs" in existing_tables:
+            # Schema already applied
+            return
+
         if schema_path.exists():
             schema_sql = schema_path.read_text()
-            # Execute each statement separately
+            # Try to execute migration statements
+            migration_failed = False
             for statement in schema_sql.split(";"):
                 statement = statement.strip()
                 if statement and not statement.startswith("--"):
                     try:
                         con.execute(statement)
                     except Exception as e:
+                        error_msg = str(e).lower()
                         # Ignore "already exists" errors
-                        if "already exists" not in str(e).lower():
-                            logger.warning(f"Schema statement warning: {e}")
+                        if "already exists" in error_msg:
+                            continue
+                        # FK constraint failures or table-not-found errors mean we should use fallback
+                        if any(x in error_msg for x in ["foreign key", "not found", "does not exist"]):
+                            logger.debug(f"Migration statement failed (using fallback): {e}")
+                            migration_failed = True
+                            break
+                        else:
+                            # Other errors should be raised
+                            raise
+
+            if migration_failed:
+                # Use fallback without FK constraints
+                self._create_clustering_tables(con)
         else:
             # Fallback: create tables directly
             self._create_clustering_tables(con)
