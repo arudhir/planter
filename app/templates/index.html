@@ -293,6 +293,55 @@
         <form method="POST">
             <textarea name="sequence" id="sequenceInput" placeholder="Enter your protein sequence here"></textarea>
             <br>
+
+            <!-- Advanced search parameters -->
+            <details style="margin-top: 15px; margin-bottom: 15px;">
+                <summary style="cursor: pointer; font-weight: bold; padding: 10px; background-color: #f1f1f1; border-radius: 4px;">Advanced Search Parameters</summary>
+                <div style="padding: 15px; border: 1px solid #ddd; border-top: none; background-color: #fafafa;">
+                    <div class="config-option">
+                        <label for="sensitivity">Sensitivity (1.0-7.5):</label>
+                        <input type="number" name="sensitivity" id="sensitivity" value="4.0" min="1.0" max="7.5" step="0.5" style="width: 100px;">
+                        <small style="color: #666;">Higher = more sensitive but slower</small>
+                    </div>
+
+                    <div class="config-option">
+                        <label for="e_value">E-value threshold:</label>
+                        <input type="number" name="e_value" id="e_value" value="0.001" min="0" max="1" step="0.0001" style="width: 100px;">
+                        <small style="color: #666;">Maximum E-value for matches</small>
+                    </div>
+
+                    <div class="config-option">
+                        <label for="coverage">Coverage threshold (0.0-1.0):</label>
+                        <input type="number" name="coverage" id="coverage" value="0.0" min="0" max="1" step="0.1" style="width: 100px;">
+                        <small style="color: #666;">Minimum fraction of query covered</small>
+                    </div>
+
+                    <div class="config-option">
+                        <label for="max_seqs">Maximum sequences:</label>
+                        <input type="number" name="max_seqs" id="max_seqs" value="300" min="1" max="10000" step="10" style="width: 100px;">
+                        <small style="color: #666;">Maximum hits to return</small>
+                    </div>
+
+                    <div class="config-option">
+                        <label for="alignment_mode">Alignment mode (0-4):</label>
+                        <input type="number" name="alignment_mode" id="alignment_mode" value="3" min="0" max="4" step="1" style="width: 100px;">
+                        <small style="color: #666;">3 = backtrace (default)</small>
+                    </div>
+
+                    <div class="config-option">
+                        <label for="mask">Mask low complexity (0 or 1):</label>
+                        <input type="number" name="mask" id="mask" value="1" min="0" max="1" step="1" style="width: 100px;">
+                        <small style="color: #666;">1 = mask low complexity regions</small>
+                    </div>
+
+                    <div class="config-option">
+                        <label for="min_seq_id">Minimum sequence identity (0.0-1.0):</label>
+                        <input type="number" name="min_seq_id" id="min_seq_id" value="0.0" min="0" max="1" step="0.05" style="width: 100px;">
+                        <small style="color: #666;">Minimum sequence identity for matches</small>
+                    </div>
+                </div>
+            </details>
+
             <button type="submit">Search</button>
             <button type="button" id="loadExample">Load Example</button>
         </form>

@@ -1480,17 +1480,29 @@ class SequenceDBBuilder:
                 # Create temporary table for TSV data
                 self.con.execute(
                     """
-                    CREATE TEMP TABLE temp_clusters AS 
-                    SELECT 
+                    CREATE TEMP TABLE temp_clusters AS
+                    SELECT
                         representative as representative_seqhash_id,
                         member as seqhash_id
-                    FROM read_csv_auto(?, sep='\t', header=False, 
+                    FROM read_csv_auto(?, sep='\t', header=False,
                                     names=['representative', 'member'])
                     WHERE representative IN (SELECT seqhash_id FROM sequences)
                     AND member IN (SELECT seqhash_id FROM sequences)
                     """,
                     [tsv_path],
                 )
+
+                # Check for duplicates
+                dup_check = self.con.execute("""
+                    SELECT
+                        COUNT(*) as total,
+                        COUNT(DISTINCT (seqhash_id, representative_seqhash_id)) as unique_pairs
+                    FROM temp_clusters
+                """).fetchone()
+
+                dup_count = dup_check[0] - dup_check[1]
+                if dup_count > 0:
+                    self.logger.warning(f"Found {dup_count} duplicate entries in cluster TSV - will deduplicate")
 
                 # Insert clusters
                 self.con.execute(
@@ -1512,11 +1524,11 @@ class SequenceDBBuilder:
                     """
                 )
 
-                # Insert cluster members
+                # Insert cluster members (deduplicate in case of duplicates in TSV)
                 self.con.execute(
                     """
                     INSERT INTO cluster_members (seqhash_id, cluster_id)
-                    SELECT 
+                    SELECT DISTINCT
                         tc.seqhash_id,
                         c.cluster_id
                     FROM temp_clusters tc

@@ -682,7 +682,64 @@ def update_clusters(
         max_size = con.execute("SELECT MAX(size) FROM clusters").fetchone()[0]
         logging.info(f"Average cluster size: {avg_size:.2f}")
         logging.info(f"Largest cluster size: {max_size}")
-        
+
+        # Step 8: Ensure ALL sequences with repseq_id are in cluster_members
+        # This handles sequences from previous runs that might not be in the TSV
+        logging.info("Ensuring all clustered sequences are in cluster_members table...")
+
+        # Count sequences that need to be added
+        missing_members = con.execute("""
+            SELECT COUNT(*)
+            FROM sequences s
+            WHERE s.repseq_id IS NOT NULL
+              AND s.seqhash_id NOT IN (SELECT seqhash_id FROM cluster_members)
+        """).fetchone()[0]
+
+        if missing_members > 0:
+            logging.info(f"Found {missing_members} sequences with repseq_id missing from cluster_members")
+
+            # Create missing cluster entries
+            con.execute("""
+                INSERT OR IGNORE INTO clusters (cluster_id, representative_seqhash_id, size)
+                SELECT DISTINCT
+                    repseq_id AS cluster_id,
+                    repseq_id AS representative_seqhash_id,
+                    0 AS size
+                FROM sequences
+                WHERE repseq_id IS NOT NULL
+                  AND repseq_id NOT IN (SELECT cluster_id FROM clusters)
+            """)
+
+            # Insert missing cluster_members
+            con.execute("""
+                INSERT OR IGNORE INTO cluster_members (seqhash_id, cluster_id)
+                SELECT
+                    seqhash_id,
+                    repseq_id AS cluster_id
+                FROM sequences
+                WHERE repseq_id IS NOT NULL
+                  AND seqhash_id NOT IN (SELECT seqhash_id FROM cluster_members)
+            """)
+
+            logging.info(f"Added {missing_members} missing sequences to cluster_members")
+        else:
+            logging.info("All sequences with repseq_id are already in cluster_members")
+
+        # Update all cluster sizes to reflect true membership
+        con.execute("""
+            UPDATE clusters
+            SET size = (
+                SELECT COUNT(*)
+                FROM cluster_members cm
+                WHERE cm.cluster_id = clusters.cluster_id
+            )
+        """)
+
+        # Log final statistics
+        final_member_count = con.execute("SELECT COUNT(*) FROM cluster_members").fetchone()[0]
+        final_cluster_count = con.execute("SELECT COUNT(*) FROM clusters").fetchone()[0]
+        logging.info(f"Final totals: {final_cluster_count} clusters, {final_member_count} cluster members")
+
         # Commit the transaction
         con.execute("COMMIT")
         logging.info("Successfully updated cluster information")
@@ -930,7 +987,8 @@ def extract_representative_sequences(
     query = """
         SELECT seqhash_id, sequence
         FROM sequences
-        WHERE repseq_id = seqhash_id;
+        WHERE repseq_id = seqhash_id           -- Existing representatives
+           OR repseq_id IS NULL;                -- Unclustered sequences (new samples)
     """
 
     try:
@@ -1352,3 +1410,147 @@ def get_clustering_stats(db_path: Union[str, Path]) -> Dict:
 
     finally:
         con.close()
+
+
+def export_sequences_to_fasta(
+    db_path: Union[str, Path],
+    output_path: Union[str, Path],
+    representatives_only: bool = False,
+    where_clause: Optional[str] = None,
+    chunk_size: int = 10000
+) -> int:
+    """
+    Export sequences from DuckDB to FASTA format.
+
+    Args:
+        db_path: Path to DuckDB database
+        output_path: Path to output FASTA file
+        representatives_only: If True, only export representative sequences
+        where_clause: Optional SQL WHERE clause (without the WHERE keyword)
+        chunk_size: Number of sequences to process at once
+
+    Returns:
+        Number of sequences exported
+
+    Examples:
+        # Export all sequences
+        export_sequences_to_fasta("master.duckdb", "all_sequences.faa")
+
+        # Export only representatives
+        export_sequences_to_fasta("master.duckdb", "repseq.faa", representatives_only=True)
+
+        # Export sequences longer than 400 aa
+        export_sequences_to_fasta("master.duckdb", "long.faa", where_clause="length >= 400")
+    """
+    db_path = Path(db_path)
+    output_path = Path(output_path)
+
+    if not db_path.exists():
+        raise FileNotFoundError(f"Database not found at {db_path}")
+
+    # Build query
+    query = "SELECT seqhash_id, sequence FROM sequences"
+
+    conditions = []
+    if representatives_only:
+        conditions.append("is_representative = true")
+    if where_clause:
+        conditions.append(f"({where_clause})")
+
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+
+    query += " ORDER BY seqhash_id"
+
+    logger.info(f"Connecting to database: {db_path}")
+    conn = duckdb.connect(str(db_path), read_only=True)
+
+    # Get total count (remove ORDER BY for count query)
+    count_query = query.replace("SELECT seqhash_id, sequence", "SELECT COUNT(*)")
+    count_query = count_query.replace(" ORDER BY seqhash_id", "")
+    total = conn.execute(count_query).fetchone()[0]
+    logger.info(f"Total sequences to export: {total:,}")
+
+    # Export in chunks
+    logger.info(f"Exporting to: {output_path}")
+    exported = 0
+    offset = 0
+
+    with open(output_path, 'w') as f:
+        while offset < total:
+            chunk_query = f"{query} LIMIT {chunk_size} OFFSET {offset}"
+            result = conn.execute(chunk_query).fetchall()
+
+            for seqhash_id, sequence in result:
+                f.write(f">{seqhash_id}\n{sequence}\n")
+                exported += 1
+
+            offset += chunk_size
+
+            # Progress logging
+            if offset % (chunk_size * 10) == 0:
+                progress = min(100, (offset / total) * 100)
+                logger.info(f"Progress: {exported:,}/{total:,} ({progress:.1f}%)")
+
+    logger.info(f"Export complete: {exported:,} sequences written to {output_path}")
+    conn.close()
+
+    return exported
+
+
+def get_fasta_path(
+    db_path: Union[str, Path],
+    representatives_only: bool = False,
+    cache_dir: Optional[Union[str, Path]] = None,
+    force_regenerate: bool = False
+) -> Path:
+    """
+    Get path to FASTA file, generating it from database if needed.
+
+    This is a convenience function for tests and scripts that need a FASTA file.
+    It will cache the FASTA file and reuse it unless force_regenerate is True.
+
+    Args:
+        db_path: Path to DuckDB database
+        representatives_only: If True, only export representative sequences
+        cache_dir: Directory to cache FASTA files (default: same dir as database)
+        force_regenerate: If True, regenerate even if cached file exists
+
+    Returns:
+        Path to FASTA file
+
+    Examples:
+        # Get all sequences FASTA (will cache it)
+        fasta_path = get_fasta_path("master.duckdb")
+
+        # Get representatives FASTA
+        repseq_path = get_fasta_path("master.duckdb", representatives_only=True)
+    """
+    db_path = Path(db_path)
+
+    if cache_dir is None:
+        cache_dir = db_path.parent
+    else:
+        cache_dir = Path(cache_dir)
+
+    # Generate filename based on parameters
+    db_name = db_path.stem
+    if representatives_only:
+        fasta_filename = f"{db_name}_repseq.faa"
+    else:
+        fasta_filename = f"{db_name}_all.faa"
+
+    fasta_path = cache_dir / fasta_filename
+
+    # Check if we need to generate
+    if force_regenerate or not fasta_path.exists():
+        logger.info(f"Generating FASTA file: {fasta_path}")
+        export_sequences_to_fasta(
+            db_path=db_path,
+            output_path=fasta_path,
+            representatives_only=representatives_only
+        )
+    else:
+        logger.info(f"Using cached FASTA file: {fasta_path}")
+
+    return fasta_path

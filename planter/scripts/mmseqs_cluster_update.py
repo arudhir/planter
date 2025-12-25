@@ -129,6 +129,8 @@ class MMseqsClusterUpdater:
                 self.paths["sequenceDB"],
                 self.paths["clusterDB"],
                 self.tmp_dir,
+                "--cluster-mode", "2",  # Greedy clustering by sequence length
+                "--cov-mode", "1",      # Select longest sequence as representative
             ]
         )
         self.run_command(
@@ -201,6 +203,8 @@ class MMseqsClusterUpdater:
                 self.paths["newSequenceDB"],
                 self.paths["newClusterDB"],
                 self.tmp_dir,
+                "--cluster-mode", "2",  # Greedy clustering by sequence length
+                "--cov-mode", "1",      # Select longest sequence as representative
             ]
         )
 
